@@ -115,23 +115,12 @@ follow [../docs/GETTING_STARTED.md](../docs/GETTING_STARTED.md).
 
 ---
 
-## Phase 7: Build Cohorts & Run Analyses (Per study, ~30–60 minutes)
+## Phases 7-8: Analysis & Transportable Packet — N/A (data-generation-only)
 
-- [ ] **Step 14.1:** Build cohorts (`Rscript workflow/02_define_omop_cohort_outcome_covariates.R`)
-- [ ] **Step 14.2:** Run analyses (`Rscript workflow/07_setup_analysis_env.R`, then `Rscript workflow/08_run_analysis_and_manuscript_report.R`)
-- [ ] **Step 14.3:** Review outputs in `output/<your-study>/`
-
----
-
-## Phase 8: Create Transportable Code Packet (Per study, ~5 minutes)
-
-- [ ] **Step 15:** Generate bundle:
-  ```bash
-  bash workflow/09_build_portable_analysis_bundle.sh
-  # OR (Windows PowerShell):
-  powershell -ExecutionPolicy Bypass -File workflow/09_build_portable_analysis_bundle.ps1
-  ```
-- [ ] **Share or archive** `portable/transportable_bundle/`
+This is a **data-generation-only** repo. There is no analysis, Word report, or portable-bundle
+step here (`workflow/07-09` have been removed). Once Steps 1-6 produce and QC the synthetic CDM,
+register/update this dataset (`id: pad_amp_ed`) in `../synthetic_data/registry.yaml` — that is the
+final deliverable. The real analysis (Strategus + Word manuscript) lives in `pad-amp-ed-desc`.
 
 ---
 

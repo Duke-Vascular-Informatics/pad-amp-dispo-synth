@@ -34,32 +34,6 @@
       "problemMatcher": []
     },
     {
-      "label": "Analyst: Run Step 8 Analysis",
-      "type": "shell",
-      "command": "Rscript",
-      "args": ["workflow/08_run_analysis_and_manuscript_report.R"],
-      "problemMatcher": []
-    },
-    {
-      "label": "Analyst: Build Portable Bundle (bash)",
-      "type": "shell",
-      "command": "bash",
-      "args": ["workflow/09_build_portable_analysis_bundle.sh"],
-      "problemMatcher": []
-    },
-    {
-      "label": "Analyst: Build Portable Bundle (PowerShell)",
-      "type": "shell",
-      "command": "powershell",
-      "args": [
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "workflow/09_build_portable_analysis_bundle.ps1"
-      ],
-      "problemMatcher": []
-    },
-    {
       "label": "Analyst: Create Support Bundle",
       "type": "shell",
       "command": "Rscript",

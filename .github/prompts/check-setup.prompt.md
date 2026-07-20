@@ -137,9 +137,10 @@ If everything passes:
 
 ```
 --- Summary ---
-  ALL CHECKS PASSED — ready to run Step 8.
-  Next: Rscript workflow/07_setup_analysis_env.R
-        Rscript workflow/08_run_analysis_and_manuscript_report.R
+  ALL CHECKS PASSED — ready to generate data.
+  Next (data-generation-only repo — no Steps 7-9):
+        Rscript workflow/03_generate_synthea_module_artifacts.R
+        (then Steps 4-6: generate CSVs, ETL, QC)
 ```
 
 ---

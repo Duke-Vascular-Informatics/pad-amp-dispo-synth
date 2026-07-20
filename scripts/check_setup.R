@@ -339,13 +339,14 @@ if (is.null(analyses)) {
 cat("\n--- Summary ---\n")
 total_checks <- issues + warnings
 if (issues == 0 && warnings == 0) {
-  cat("  ALL CHECKS PASSED — ready to run Step 8.\n")
-  cat("  Next: Rscript workflow/07_setup_analysis_env.R\n")
-  cat("        Rscript workflow/08_run_analysis_and_manuscript_report.R\n\n")
+  cat("  ALL CHECKS PASSED — ready to generate data.\n")
+  cat("  Next (data-generation-only repo — no Steps 7-9):\n")
+  cat("        Rscript workflow/03_generate_synthea_module_artifacts.R\n")
+  cat("        (then Steps 4-6: generate CSVs, ETL, QC)\n\n")
   quit(status = 0)
 } else {
   if (issues > 0) {
-    cat("  FAIL:    ", issues, " item(s) must be resolved before running Step 8.\n", sep = "")
+    cat("  FAIL:    ", issues, " item(s) must be resolved before generating data.\n", sep = "")
   }
   if (warnings > 0) {
     cat("  WARNING: ", warnings, " item(s) to review (non-blocking).\n", sep = "")
