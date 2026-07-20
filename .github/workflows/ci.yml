@@ -1,0 +1,173 @@
+name: R CI
+
+# All jobs are gated by the ENABLE_R_CI repository variable.
+# Repos copied from this template have no variable set, so CI is disabled by default.
+# To opt in: GitHub → Settings → Variables → Actions → New → ENABLE_R_CI = true
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 0: Validate documentation command/path references.
+  # Catches drift where docs mention commands or script paths that do not exist
+  # or use incorrect invocation types (e.g., Rscript on .sh/.ps1 files).
+  # ---------------------------------------------------------------------------
+  docs-consistency:
+    name: Validate docs command references
+    runs-on: ubuntu-latest
+    if: vars.ENABLE_R_CI == 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: 'release'
+          use-public-rspm: true
+
+      - name: Validate documentation commands and paths
+        run: |
+          Rscript scripts/maintainer/validate_docs_commands.R
+
+      - name: Verify generated checklist step index
+        run: |
+          Rscript scripts/maintainer/generate_checklist_step_index.R --check
+
+  # ---------------------------------------------------------------------------
+  # Job 0b: Strict docs freeze checks for release-quality merges/tags.
+  # Escalates warnings to failures and enforces stricter governance checks.
+  # ---------------------------------------------------------------------------
+  docs-freeze:
+    name: Strict docs freeze checks
+    runs-on: ubuntu-latest
+    if: vars.ENABLE_R_CI == 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: 'release'
+          use-public-rspm: true
+
+      - name: Run strict documentation validation
+        env:
+          DOCS_STRICT: '1'
+        run: |
+          Rscript scripts/maintainer/validate_docs_commands.R
+
+      - name: Verify generated checklist step index (strict)
+        run: |
+          Rscript scripts/maintainer/generate_checklist_step_index.R --check
+
+  # ---------------------------------------------------------------------------
+  # Job 1: Lint all R source files with lintr.
+  # Fails if any lint is found so style and safety issues are caught on every
+  # push before they accumulate.  Configuration is in .lintr at the repo root.
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint R source files
+    runs-on: ubuntu-latest
+    if: vars.ENABLE_R_CI == 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: 'release'
+          use-public-rspm: true
+
+      - name: Install lintr
+        run: Rscript -e "install.packages('lintr', repos = 'https://cloud.r-project.org')"
+
+      - name: Lint R files
+        run: |
+          Rscript -e "
+            lints <- lintr::lint_dir(
+              '.',
+              pattern = '[.][Rr]\$',
+              exclusions = list('renv', 'portable', 'scripts/archive')
+            )
+            print(lints)
+            if (length(lints) > 0) {
+              message(length(lints), ' lint(s) found. See output above.')
+              quit(status = 1L)
+            }
+            message('No lints found.')
+          "
+
+  # ---------------------------------------------------------------------------
+  # Job 3: Run testthat unit tests.
+  # Tests cover pure/logic functions that do not require a live database:
+  # is_transient_db_error, with_db_retry, clamp_probability, compute_ece,
+  # get_domain_mapping, build_calibration_table, compute_binary_metrics,
+  # score_discrimination_metrics, build_combined_feature_table, read_score_specs.
+  # ---------------------------------------------------------------------------
+  test:
+    name: Run unit tests
+    runs-on: ubuntu-latest
+    if: vars.ENABLE_R_CI == 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: 'release'
+          use-public-rspm: true
+
+      - name: Install test dependencies
+        run: |
+          Rscript -e "
+            pkgs <- c('testthat', 'withr', 'pROC', 'PRROC')
+            install.packages(pkgs, repos = 'https://cloud.r-project.org')
+          "
+
+      - name: Run tests
+        run: |
+          Rscript -e "
+            library(testthat)
+            results <- test_dir('tests/testthat', reporter = 'progress', stop_on_failure = TRUE)
+          "
+
+  # ---------------------------------------------------------------------------
+  # Job 2: Validate renv.lock integrity.
+  # Confirms the lock file is well-formed JSON with the expected renv structure
+  # (R version field, Packages list).  Does NOT attempt a full renv::restore()
+  # — that would require installing all OHDSI packages and take 30+ minutes.
+  # ---------------------------------------------------------------------------
+  renv-validate:
+    name: Validate renv.lock
+    runs-on: ubuntu-latest
+    if: vars.ENABLE_R_CI == 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: 'release'
+          use-public-rspm: true
+
+      - name: Install renv
+        run: Rscript -e "install.packages('renv', repos = 'https://cloud.r-project.org')"
+
+      - name: Validate renv.lock structure
+        run: |
+          Rscript -e "
+            lock <- tryCatch(
+              renv::lockfile_read('renv.lock'),
+              error = function(e) stop('renv.lock is invalid: ', conditionMessage(e))
+            )
+            r_ver   <- lock[['R']][['Version']]
+            n_pkgs  <- length(lock[['Packages']])
+            if (is.null(r_ver))  stop('renv.lock missing R\$Version field')
+            if (n_pkgs == 0)     stop('renv.lock Packages list is empty')
+            cat('renv.lock is valid\n')
+            cat('  R version :', r_ver,  '\n')
+            cat('  Packages  :', n_pkgs, '\n')
+          "

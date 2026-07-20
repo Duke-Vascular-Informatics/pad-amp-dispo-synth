@@ -1,0 +1,84 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Analyst: Install Git Hooks",
+      "type": "shell",
+      "command": "bash",
+      "args": ["scripts/hooks/install_git_hooks.sh"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Analyst: Check Setup",
+      "type": "shell",
+      "command": "Rscript",
+      "args": ["scripts/check_setup.R"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Analyst: Concept Lookup",
+      "type": "shell",
+      "command": "Rscript",
+      "args": [
+        "scripts/concept_lookup.R",
+        "${input:conceptTerm}",
+        "${input:conceptDomain}"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Analyst: Validate Step 2 Artifacts",
+      "type": "shell",
+      "command": "Rscript",
+      "args": ["workflow/02_define_omop_cohort_outcome_covariates.R"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Analyst: Run Step 8 Analysis",
+      "type": "shell",
+      "command": "Rscript",
+      "args": ["workflow/08_run_analysis_and_manuscript_report.R"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Analyst: Build Portable Bundle (bash)",
+      "type": "shell",
+      "command": "bash",
+      "args": ["workflow/09_build_portable_analysis_bundle.sh"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Analyst: Build Portable Bundle (PowerShell)",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "workflow/09_build_portable_analysis_bundle.ps1"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Analyst: Create Support Bundle",
+      "type": "shell",
+      "command": "Rscript",
+      "args": ["scripts/create_support_bundle.R"],
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "conceptTerm",
+      "type": "promptString",
+      "description": "Clinical term to search (example: hip replacement)"
+    },
+    {
+      "id": "conceptDomain",
+      "type": "pickString",
+      "description": "OMOP domain",
+      "options": ["Condition", "Drug", "Procedure", "Measurement", "Observation", "Visit"],
+      "default": "Condition"
+    }
+  ]
+}

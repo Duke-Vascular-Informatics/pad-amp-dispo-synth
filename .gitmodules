@@ -1,0 +1,4 @@
+[submodule "external/synthea"]
+	path = external/synthea
+	url = https://github.com/adam-mdmph/synthea-pad.git
+	branch = main

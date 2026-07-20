@@ -1,0 +1,204 @@
+# =============================================================================
+# study_params.yaml
+# OMOP Observational Study Parameters
+#
+# This is the ONLY file you need to edit for a new study.
+# All settings here flow automatically to SQL templates and analysis scripts.
+#
+# SETUP ORDER:
+#   1. Fill in every TODO item in this file
+#   2. Run: Rscript scripts/find_todos.R   — check remaining placeholders
+#   3. Run: Rscript workflow/02_define_omop_cohort_outcome_covariates.R  — validate
+#   4. Populate covariates/components.csv and covariates/component_concepts.csv
+#   5. Write your analysis in workflow/08 Sections 7–9, then run Step 8
+#
+# CONCEPT ID LOOKUP — before writing any concept ID, run in Claude Code chat:
+#   /concept-lookup total hip replacement procedure
+#   /concept-lookup venous thromboembolism condition
+# =============================================================================
+
+# =============================================================================
+# STUDY IDENTITY
+# =============================================================================
+study_name:   "my_study"          # TODO [CONFIG]: lowercase, underscores only; used in output file names
+study_design: "prognostic_model"  # TODO [CONFIG]: cohort_characterization | prognostic_model | causal_inference | descriptive
+
+# =============================================================================
+# MODEL REFERENCE
+# Metadata for the model or score being externally validated.
+# Displayed by workflow/02 in the Step 2 manifest for quick verification.
+# All fields are optional — fill in what is known from the source paper.
+# =============================================================================
+model_reference:
+  model_type:   "integer_risk_score"  # TODO [CONFIG]: integer_risk_score | plp_random_forest | plp_lasso | plp_ridge | logistic_regression
+  score_name:   ""                    # TODO [CONFIG]: human-readable name (e.g. "Anderson SSI Risk Score")
+  source_paper: ""                    # TODO [CONFIG]: citation (e.g. "Anderson et al. 2022, J Vasc Surg")
+  doi:          ""                    # optional DOI
+
+  # Original development population characteristics (from the source paper).
+  # Leave as ~ (null) when not reported.
+  original_n:               ~   # N in the development cohort
+  original_event_rate:      ~   # outcome rate in the development cohort (0–1 or %)
+  original_c_statistic:     ~   # AUROC / C-statistic from the source paper
+  original_calibration_slope: ~ # calibration slope if reported
+
+  time_at_risk_days: ~          # TODO [CONFIG]: matches prediction_window_days (e.g. 30 | 90)
+
+# =============================================================================
+# STUDY DATE WINDOW
+# Index events outside this range are excluded from all cohorts.
+# =============================================================================
+study_start_date: "2017-01-01"   # TODO [CONFIG]
+study_end_date:   "2025-12-31"   # TODO [CONFIG]
+
+# =============================================================================
+# DATABASE SCHEMAS
+# =============================================================================
+cdm_schema:     "cdm_my_study"       # TODO [CONFIG]: CDM schema populated by Step 5 ETL
+
+# results_schema, cohort_table, and output_folder default to
+#   <study_name>_results, <study_name>_cohort, output/<study_name>
+# (with hyphens / spaces / dots in study_name collapsed to underscores).
+# Uncomment and set explicitly only if you need a non-standard name.
+# results_schema: ~
+# cohort_table:   ~
+
+# Optional: set only when the results schema is in a different SQL Server database
+# from the CDM. Leave commented out otherwise.
+# results_database: ~
+
+# =============================================================================
+# TARGET / EXPOSURE COHORT
+# Defines WHO enters the study (index event) and WHEN (index date).
+# =============================================================================
+target:
+  cohort_id: 1
+  sql_file:  "cohorts/target_surgery.sql"
+
+  # Visit type filter — OMOP visit_concept_id values.
+  # 9201 = Inpatient Visit | 9202 = Outpatient Visit | 9203 = Emergency Room
+  # Set to [] to include all visit types (no filter applied).
+  visit_concept_ids: [9201]   # TODO [CONFIG]: adjust or set to [] for all visit types
+
+  # Minimum age at index date (years). Set to 0 for no age restriction.
+  min_age_at_index: 18   # TODO [CONFIG]: adjust or set to 0 for no restriction
+
+  # Index event — the qualifying exposure that marks study entry.
+  # domain: procedure | condition | drug
+  # ancestor_concept_ids: one or more standard OMOP concept IDs; all descendants
+  # are captured automatically via concept_ancestor rollup.
+  # TODO [TARGET COHORT]: Replace 0 with your verified index event concept ID(s).
+  index_event:
+    domain: "procedure"
+    ancestor_concept_ids: [0]   # TODO [TARGET COHORT]: replace 0 — use /concept-lookup [REQUIRES vocab query]
+
+  # Washout: patients who had this condition before their index date are excluded.
+  # Typical use: exclude patients with a prior outcome (incident / new-user design).
+  # Set ancestor_concept_ids to [] to disable washout entirely.
+  # TODO [TARGET COHORT]: Replace 0 with your washout concept ID, or set to [].
+  washout:
+    domain: "condition"
+    ancestor_concept_ids: [0]   # TODO [TARGET COHORT]: replace 0 or set to [] to disable [REQUIRES vocab query]
+    lookback_days: 365
+
+# =============================================================================
+# OUTCOME COHORT
+# Defines WHAT the study is measuring.
+# Set cohort_id and sql_file to ~ (null) for cohort_characterization or descriptive designs.
+# =============================================================================
+outcome:
+  cohort_id: 2
+  sql_file:  "cohorts/outcome_ssi.sql"
+
+  # Outcome ancestor concept IDs. All descendants are captured via concept_ancestor.
+  # TODO [OUTCOME COHORT]: Replace 0 with your verified outcome concept ID.
+  ancestor_concept_ids: [0]   # TODO [OUTCOME COHORT]: replace 0 — use /concept-lookup [REQUIRES vocab query]
+
+# =============================================================================
+# COMPARATOR COHORT (causal inference only)
+# Set cohort_id to ~ (null) to disable for all other study designs.
+# When enabled, fill in index_event.ancestor_concept_ids exactly as you did
+# for the target cohort — the comparator is the ALTERNATIVE exposure being
+# compared against the target (e.g. Drug A vs Drug B, Procedure X vs Procedure Y).
+# =============================================================================
+comparator:
+  cohort_id: ~   # ~ = disabled. Set to an integer (e.g. 3) for causal inference
+  sql_file:  "cohorts/comparator_cohort.sql"
+  visit_concept_ids: [9201]
+  min_age_at_index: 18
+  index_event:
+    domain: "procedure"
+    ancestor_concept_ids: ~   # TODO [COMPARATOR]: set when cohort_id is enabled [REQUIRES vocab query]
+  washout:
+    domain: "condition"
+    ancestor_concept_ids: ~   # ~ = no washout; set to concept IDs to enable
+    lookback_days: 365
+
+# =============================================================================
+# ANALYSIS PARAMETERS
+# =============================================================================
+# Days after index date during which the outcome is counted.
+# Must match riskWindowEnd in Step 8 analysis settings.
+prediction_window_days: 90   # TODO [CONFIG]: set to your follow-up window in days
+
+# Minimum days of prior observation required before index date.
+# Patients with fewer prior observation days are excluded.
+min_prior_observation_days: 365   # TODO [CONFIG]: adjust or set to 0 for no restriction
+
+# Days before index date for covariate extraction window.
+covariate_lookback_days: 365   # TODO [CONFIG]: adjust if needed
+
+# =============================================================================
+# ANALYSES
+# Set each flag to true to enable that analysis block in workflow/08.
+# Multiple analyses can run in a single Step 8 execution.
+# No editing of workflow/08 is needed — these flags drive everything.
+# =============================================================================
+analyses:
+  cohort_characterization: false  # FeatureExtraction default covariate summary of the target cohort
+  prognostic_model:         false  # PatientLevelPrediction LASSO (default; swap model in workflow/08)
+  causal_inference:         false  # CohortMethod PS matching (requires comparator cohort in config)
+  integer_risk_score:       false  # custom integer score pipeline (R/risk_score_pipeline.R)
+  word_report:              false  # Word report via R/report_extended.R (run after a pipeline above)
+  plp_model_validation:     false  # external validation of a prebuilt PLP model (R/plp_validation_pipeline.R)
+
+# =============================================================================
+# REPORT GENERATION
+# Controls how generate_manuscript_report() renders narrative text and tables.
+# score_type is only used when study_design is "prognostic_model".
+# Other study designs will use their own report: sub-keys when implemented.
+# =============================================================================
+report:
+  score_type:             "integer"                                  # "integer" | "lasso"
+  outcome_label:          "Outcome"                                  # TODO [CONFIG]: outcome display name, e.g. "Surgical Site Infection (SSI)"
+  model_type_description: "integer risk score"                       # TODO [CONFIG]: e.g. "integer risk score" | "LASSO model"
+  # lasso score_type only — path to PatientLevelPrediction variable-importance RDS:
+  # var_imp_file: "model/varImp.rds"
+
+  # ---------------------------------------------------------------------------
+  # Narrative Methods text — Claude Code fills these in before running the report
+  # ---------------------------------------------------------------------------
+  # Before enabling word_report: true, ask Claude Code to read your analytic
+  # files and populate these fields. See the CLAUDE CODE INSTRUCTIONS block at
+  # the top of R/report_prognostic.R for the exact procedure.
+  # Leave as ~ (null) to get a placeholder reminder string in the report output.
+  # ---------------------------------------------------------------------------
+  study_title: ~                        # TODO [CONFIG]: e.g. "Hip Replacement — 90-Day Readmission Risk Score: External Validation"
+  target_population_description: ~     # TODO [CONFIG]: 2–3 sentences — who enters the cohort, index event, washout
+  outcome_description: ~               # TODO [CONFIG]: 2–3 sentences — outcome concept IDs, ascertainment, prediction window
+  score_description: ~                 # TODO [CONFIG]: narrative description of the risk model components and scoring algorithm
+
+# =============================================================================
+# OUTPUT
+# =============================================================================
+# Defaults to output/<study_name> when omitted.
+# Uncomment and set only if you need a non-standard output path.
+# output_folder: ~
+
+# =============================================================================
+# DATABASE METADATA
+# Used in PatientLevelPrediction result objects and analysis reports.
+# =============================================================================
+cdm_database_id:          "my_cdm_v5.4"                                            # TODO [CONFIG]
+cdm_database_name:        "My Study Database"                                       # TODO [CONFIG]
+cdm_database_description: "Brief description of the patient population and database."  # TODO [CONFIG]

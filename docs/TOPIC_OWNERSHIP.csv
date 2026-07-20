@@ -1,0 +1,3 @@
+topic,owner_file,heading_regex,severity
+canonical_workflow_steps,docs/GETTING_STARTED.md,^## Step [0-9]+:,warning
+canonical_commands,docs/COMMANDS.md,^## Core Commands$|^## Guardrails$,warning

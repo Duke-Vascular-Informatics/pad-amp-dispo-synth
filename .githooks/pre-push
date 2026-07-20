@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+filter_renv_noise() {
+  awk '
+    BEGIN { skip = 0 }
+    {
+      if ($0 ~ /^The following package\(s\) are missing entries in the cache:/) {
+        skip = 1
+        next
+      }
+      if ($0 ~ /^The following package\(s\) have broken symlinks into the cache:/) {
+        skip = 2
+        next
+      }
+      if (skip == 1 && $0 ~ /^These packages will need to be reinstalled\./) {
+        skip = 0
+        next
+      }
+      if (skip == 2 && $0 ~ /^Use `renv::repair\(\)` to try and reinstall these packages\./) {
+        skip = 0
+        next
+      }
+      if ($0 ~ /^- One or more packages recorded in the lockfile are not installed\./) next
+      if ($0 ~ /^- Use `renv::status\(\)` for more details\./) next
+      if (skip == 0) print
+    }
+  '
+}
+
+run_rscript_filtered() {
+  local output status
+  output="$(Rscript "$@" 2>&1)"
+  status=$?
+  printf "%s\n" "$output" | filter_renv_noise
+  return "$status"
+}
+
+if [[ "${SKIP_ANALYST_HOOKS:-}" == "1" ]]; then
+  echo "[pre-push] SKIP_ANALYST_HOOKS=1 set; skipping analyst hooks."
+  exit 0
+fi
+
+if ! command -v Rscript >/dev/null 2>&1; then
+  echo "[pre-push] Rscript not found; skipping analyst checks."
+  exit 0
+fi
+
+echo "[pre-push] Validating documentation command references..."
+run_rscript_filtered scripts/maintainer/validate_docs_commands.R
+
+echo "[pre-push] Verifying CHECKLIST step index sync..."
+run_rscript_filtered scripts/maintainer/generate_checklist_step_index.R --check
+
+echo "[pre-push] Running unit tests (skips if testthat is missing)..."
+run_rscript_filtered -e "if (!requireNamespace('testthat', quietly = TRUE)) { message('testthat not installed; skipping local tests.'); quit(status = 0L) }; testthat::test_dir('tests/testthat', reporter = 'summary', stop_on_failure = TRUE)"
+
+echo "[pre-push] Complete."

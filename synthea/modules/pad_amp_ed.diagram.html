@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PAD/SSI Synthea Module Diagram</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    body { font-family: sans-serif; margin: 2em; max-width: 1400px; background: #f5f5f5; color: #222; }
+    h1 { color: #1a1a2e; }
+    .diagram-box { background: white; border: 1px solid #ddd; border-radius: 6px; padding: 1.5em; overflow-x: auto; margin-top: 1em; }
+    footer { margin-top: 3em; font-size: 0.8em; color: #aaa; border-top: 1px solid #eee; padding-top: 1em; }
+  </style>
+</head>
+<body>
+  <h1>Synthea Study Module &mdash; State Diagram</h1>
+  <p>Generated from the study module JSON. Each node shows state name, type, and codes. Open in any modern browser.</p>
+  <div class="diagram-box">
+    <div class="mermaid">
+%%{init: {'theme': 'default', 'flowchart': {'useMaxWidth': true, 'htmlLabels': true}} }%%
+flowchart TD
+  n001["&lt;b&gt;Initial&lt;/b&gt;&lt;br/&gt;[Initial]"]
+  n002["&lt;b&gt;Age Guard&lt;/b&gt;&lt;br/&gt;[Guard]"]
+  n003["&lt;b&gt;Exposure Onset Delay&lt;/b&gt;&lt;br/&gt;[Delay]"]
+  n004["&lt;b&gt;Age Cap Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n005["&lt;b&gt;Cohort Entry Distribution&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n006["&lt;b&gt;Exposure PVD Only&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 400047006: Peripheral vascular disease (vocab query — 2026-07-05)"]
+  n007["&lt;b&gt;Exposure PVD DM PAD&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 400047006: Peripheral vascular disease (vocab query — 2026-07-05)"]
+  n008["&lt;b&gt;Exposure PVD DM DM&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 44054006: Type 2 diabetes mellitus (vocab query — 2026-07-05)"]
+  n009["&lt;b&gt;Exposure DM Only&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 44054006: Type 2 diabetes mellitus (vocab query — 2026-07-05)"]
+  n010["&lt;b&gt;Index Diagnosis Encounter&lt;/b&gt;&lt;br/&gt;[Encounter]&lt;br/&gt;SNOMED-CT 185349003: Encounter for check up (vocab query — OMOP 4185932)"]
+  n011["&lt;b&gt;Cov AFib Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n012["&lt;b&gt;Cov AFib Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 49436004: Atrial fibrillation (vocab query — OMOP 313217)"]
+  n013["&lt;b&gt;Cov CAD Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n014["&lt;b&gt;Cov CAD Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 53741008: Coronary arteriosclerosis (vocab query — OMOP 317576)"]
+  n015["&lt;b&gt;Cov CHF Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n016["&lt;b&gt;Cov CHF Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 84114007: Heart failure (vocab query — OMOP 316139)"]
+  n017["&lt;b&gt;Cov HTN Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n018["&lt;b&gt;Cov HTN Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 38341003: Hypertensive disorder, systemic arterial (vocab query — 2026-07-05)"]
+  n019["&lt;b&gt;Cov DM Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n020["&lt;b&gt;Cov DM Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 44054006: Type 2 diabetes mellitus (vocab query — OMOP 201826)"]
+  n021["&lt;b&gt;Cov CKD Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n022["&lt;b&gt;Cov CKD Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 709044004: Chronic kidney disease (vocab query — OMOP 46271022)"]
+  n023["&lt;b&gt;Cov KidneyProc Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n024["&lt;b&gt;Cov KidneyProc Onset&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 265764009: Renal dialysis (vocab query — OMOP 4146536)"]
+  n025["&lt;b&gt;Cov CVD Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n026["&lt;b&gt;Cov CVD Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 62914000: Cerebrovascular disease (vocab query — OMOP 381591)"]
+  n027["&lt;b&gt;Cov Cancer Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n028["&lt;b&gt;Cov Cancer Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 363346000: Malignant neoplastic disease (vocab query — OMOP 443392)"]
+  n029["&lt;b&gt;Cov Liver Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n030["&lt;b&gt;Cov Liver Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 328383001: Chronic liver disease (vocab query — OMOP 4212540)"]
+  n031["&lt;b&gt;Cov COPD Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n032["&lt;b&gt;Cov COPD Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 13645005: Chronic obstructive lung disease (vocab query — 2026-07-05)"]
+  n033["&lt;b&gt;Cov Arthritis Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n034["&lt;b&gt;Cov Arthritis Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 396275006: Osteoarthritis (vocab query — OMOP 80180)"]
+  n035["&lt;b&gt;Cov Osteoporosis Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n036["&lt;b&gt;Cov Osteoporosis Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 64859006: Osteoporosis (vocab query — OMOP 80502)"]
+  n037["&lt;b&gt;Cov Gait Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n038["&lt;b&gt;Cov Gait Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 22325002: Abnormal gait (vocab query — OMOP 318099)"]
+  n039["&lt;b&gt;Cov GaitAtaxia Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n040["&lt;b&gt;Cov GaitAtaxia Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 20262006: Ataxia (vocab query — OMOP 376337)"]
+  n041["&lt;b&gt;Cov Falls Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n042["&lt;b&gt;Cov Falls Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 161898004: Falls (vocab query — OMOP 443596)"]
+  n043["&lt;b&gt;Cov FallInjury Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n044["&lt;b&gt;Cov FallInjury Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 398117008: Falling injury (vocab query — OMOP 432787)"]
+  n045["&lt;b&gt;Cov Neuropathy Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n046["&lt;b&gt;Cov Neuropathy Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 302226006: Peripheral neuropathy (vocab query — 2026-07-05)"]
+  n047["&lt;b&gt;Cov Dementia Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n048["&lt;b&gt;Cov Dementia Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 52448006: Dementia (vocab query — OMOP 372610)"]
+  n049["&lt;b&gt;Cov Depression Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n050["&lt;b&gt;Cov Depression Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 35489007: Depressive disorder (vocab query — OMOP 440383)"]
+  n051["&lt;b&gt;Cov Anxiety Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n052["&lt;b&gt;Cov Anxiety Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 197480006: Anxiety disorder (vocab query — OMOP 441542)"]
+  n053["&lt;b&gt;Cov Parkinsons Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n054["&lt;b&gt;Cov Parkinsons Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 49049000: Parkinson's disease (vocab query — 2026-07-05)"]
+  n055["&lt;b&gt;Cov Anemia Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n056["&lt;b&gt;Cov Anemia Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 271737000: Anemia (vocab query — OMOP 439777)"]
+  n057["&lt;b&gt;Cov Thyroid Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n058["&lt;b&gt;Cov Thyroid Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 40930008: Hypothyroidism (vocab query — OMOP 140673)"]
+  n059["&lt;b&gt;Cov Incontinence Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n060["&lt;b&gt;Cov Incontinence Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 165232002: Urinary incontinence (vocab query — OMOP 192671)"]
+  n061["&lt;b&gt;Cov Cachexia Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n062["&lt;b&gt;Cov Cachexia Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 88092000: Muscle atrophy (vocab query — OMOP 78236)"]
+  n063["&lt;b&gt;Cov Vision Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n064["&lt;b&gt;Cov Vision Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 397540003: Visual impairment (vocab query — OMOP 379806)"]
+  n065["&lt;b&gt;Cov Hearing Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n066["&lt;b&gt;Cov Hearing Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 15188001: Hearing loss (vocab query — OMOP 374375)"]
+  n067["&lt;b&gt;Cov WeightLoss Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n068["&lt;b&gt;Cov WeightLoss Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 448765001: Unintentional weight loss (vocab query — OMOP 40491502)"]
+  n069["&lt;b&gt;Cov ChronicPain Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n070["&lt;b&gt;Cov ChronicPain Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 82423001: Chronic pain (vocab query — OMOP 4281516)"]
+  n071["&lt;b&gt;Cov FTT Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n072["&lt;b&gt;Cov FTT Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 54840006: Failure to thrive (vocab query — OMOP 437986)"]
+  n073["&lt;b&gt;Cov Fatigue Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n074["&lt;b&gt;Cov Fatigue Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 84229001: Fatigue (vocab query — OMOP 4079541)"]
+  n075["&lt;b&gt;Treatment Strategy&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n076["&lt;b&gt;Non Exposed Path End&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
+  n077["&lt;b&gt;Target Exposed Path End&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
+  n078["&lt;b&gt;Pre Index Workup Delay&lt;/b&gt;&lt;br/&gt;[Delay]"]
+  n079["&lt;b&gt;Index Admission Encounter&lt;/b&gt;&lt;br/&gt;[Encounter]&lt;br/&gt;SNOMED-CT 32485007: Hospital admission (vocab query — OMOP 9201)"]
+  n080["&lt;b&gt;Index Procedure&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 88312006: Amputation of leg through tibia and fibula (vocab query — OMOP 4338257)"]
+  n081["&lt;b&gt;Post Index Inpatient Delay&lt;/b&gt;&lt;br/&gt;[Delay]"]
+  n082["&lt;b&gt;Index Encounter End&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
+  n083["&lt;b&gt;Post Discharge Observation Delay&lt;/b&gt;&lt;br/&gt;[Delay]"]
+  n084["&lt;b&gt;Outcome Assessment&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n085["&lt;b&gt;Outcome Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 50849002: Emergency room admission (vocab query — OMOP 9203)"]
+  n086["&lt;b&gt;Outcome Encounter&lt;/b&gt;&lt;br/&gt;[Encounter]&lt;br/&gt;SNOMED-CT 50849002: Emergency room admission (vocab query — OMOP 9203)"]
+  n087["&lt;b&gt;Outcome Management Duration&lt;/b&gt;&lt;br/&gt;[Delay]"]
+  n088["&lt;b&gt;Outcome Encounter End&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
+  n089["&lt;b&gt;Terminal&lt;/b&gt;&lt;br/&gt;[Terminal]"]
+  n090["&lt;b&gt;Cov DM PVD Only Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+
+  n001 --&gt; n002
+  n002 --&gt; n003
+  n003 --&gt; n004
+  n004 -- Age --&gt; n089
+  n004 -- else --&gt; n005
+  n005 -- 30% --&gt; n006
+  n005 -- 30% --&gt; n007
+  n005 -- 40% --&gt; n009
+  n006 --&gt; n010
+  n007 --&gt; n008
+  n008 --&gt; n010
+  n009 --&gt; n010
+  n010 --&gt; n011
+  n011 -- 15% --&gt; n012
+  n011 -- 85% --&gt; n013
+  n012 --&gt; n013
+  n013 -- 50% --&gt; n014
+  n013 -- 50% --&gt; n015
+  n014 --&gt; n015
+  n015 -- 30% --&gt; n016
+  n015 -- 70% --&gt; n017
+  n016 --&gt; n017
+  n017 -- 80% --&gt; n018
+  n017 -- 20% --&gt; n019
+  n018 --&gt; n019
+  n019 -- Active Condition: Type 2 diabetes mellitus --&gt; n021
+  n019 -- else --&gt; n090
+  n020 --&gt; n021
+  n021 -- 40% --&gt; n022
+  n021 -- 60% --&gt; n025
+  n022 --&gt; n023
+  n023 -- 15% --&gt; n024
+  n023 -- 85% --&gt; n025
+  n024 --&gt; n025
+  n025 -- 40% --&gt; n026
+  n025 -- 60% --&gt; n027
+  n026 --&gt; n027
+  n027 -- 10% --&gt; n028
+  n027 -- 90% --&gt; n029
+  n028 --&gt; n029
+  n029 -- 10% --&gt; n030
+  n029 -- 90% --&gt; n031
+  n030 --&gt; n031
+  n031 -- 30% --&gt; n032
+  n031 -- 70% --&gt; n033
+  n032 --&gt; n033
+  n033 -- 15% --&gt; n034
+  n033 -- 85% --&gt; n035
+  n034 --&gt; n035
+  n035 -- 15% --&gt; n036
+  n035 -- 85% --&gt; n037
+  n036 --&gt; n037
+  n037 -- 30% --&gt; n038
+  n037 -- 70% --&gt; n041
+  n038 --&gt; n039
+  n039 -- 20% --&gt; n040
+  n039 -- 80% --&gt; n041
+  n040 --&gt; n041
+  n041 -- 20% --&gt; n042
+  n041 -- 80% --&gt; n045
+  n042 --&gt; n043
+  n043 -- 30% --&gt; n044
+  n043 -- 70% --&gt; n045
+  n044 --&gt; n045
+  n045 -- 30% --&gt; n046
+  n045 -- 70% --&gt; n047
+  n046 --&gt; n047
+  n047 -- 20% --&gt; n048
+  n047 -- 80% --&gt; n049
+  n048 --&gt; n049
+  n049 -- 30% --&gt; n050
+  n049 -- 70% --&gt; n051
+  n050 --&gt; n051
+  n051 -- 20% --&gt; n052
+  n051 -- 80% --&gt; n053
+  n052 --&gt; n053
+  n053 -- 5% --&gt; n054
+  n053 -- 95% --&gt; n055
+  n054 --&gt; n055
+  n055 -- 30% --&gt; n056
+  n055 -- 70% --&gt; n057
+  n056 --&gt; n057
+  n057 -- 20% --&gt; n058
+  n057 -- 80% --&gt; n059
+  n058 --&gt; n059
+  n059 -- 20% --&gt; n060
+  n059 -- 80% --&gt; n061
+  n060 --&gt; n061
+  n061 -- 40% --&gt; n062
+  n061 -- 60% --&gt; n063
+  n062 --&gt; n063
+  n063 -- 30% --&gt; n064
+  n063 -- 70% --&gt; n065
+  n064 --&gt; n065
+  n065 -- 10% --&gt; n066
+  n065 -- 90% --&gt; n067
+  n066 --&gt; n067
+  n067 -- 20% --&gt; n068
+  n067 -- 80% --&gt; n069
+  n068 --&gt; n069
+  n069 -- 30% --&gt; n070
+  n069 -- 70% --&gt; n071
+  n070 --&gt; n071
+  n071 -- 30% --&gt; n072
+  n071 -- 70% --&gt; n073
+  n072 --&gt; n073
+  n073 -- 30% --&gt; n074
+  n073 -- 70% --&gt; n075
+  n074 --&gt; n075
+  n075 -- 5% --&gt; n076
+  n075 -- 95% --&gt; n077
+  n076 --&gt; n089
+  n077 --&gt; n078
+  n078 --&gt; n079
+  n079 --&gt; n080
+  n080 --&gt; n081
+  n081 --&gt; n082
+  n082 --&gt; n083
+  n083 --&gt; n084
+  n084 -- 65% --&gt; n089
+  n084 -- 35% --&gt; n085
+  n085 --&gt; n086
+  n086 --&gt; n087
+  n087 --&gt; n088
+  n088 --&gt; n089
+  n090 -- 60% --&gt; n020
+  n090 -- 40% --&gt; n021
+    </div>
+  </div>
+
+  <footer>
+    Rendered with <a href="https://mermaid.js.org">Mermaid.js</a> (CDN). Requires an internet connection.
+  </footer>
+  <script>mermaid.initialize({ startOnLoad: true });</script>
+</body>
+</html>

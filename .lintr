@@ -1,0 +1,22 @@
+linters: linters_with_defaults(
+    # SQL strings embedded in R routinely exceed 80 chars — use 120.
+    line_length_linter(120L),
+
+    # DatabaseConnector returns camelCase column names and the codebase uses
+    # both snake_case (local vars) and camelCase (query results).  Disabling
+    # avoids hundreds of false positives on result-frame column references.
+    object_name_linter = NULL,
+
+    # Several pipeline and report functions are necessarily complex (large SQL
+    # builders, multi-step calibration).  Raise the limit to avoid noise.
+    cyclocomp_linter(complexity_limit = 30L),
+
+    # object_usage_linter fires on variables assigned inside SqlRender::render()
+    # string templates — these are not true R assignments.
+    object_usage_linter = NULL
+  )
+exclusions: list(
+    "renv",
+    "portable",
+    "scripts/archive"
+  )

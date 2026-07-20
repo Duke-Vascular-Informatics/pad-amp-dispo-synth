@@ -1,0 +1,5 @@
+# See covariates/README.md for column definitions and usage guide.
+# This repo never runs Step 7/8 (data-generation-only) — intentionally empty.
+# Authoritative VA-FI + study-specific covariate definitions live in the
+# analysis repo: pad-amp-ed-desc/covariates/covariates.csv.
+covariate_id,covariate_name,domain,lookback_start_day,lookback_end_day,min_count,missing_is_negative

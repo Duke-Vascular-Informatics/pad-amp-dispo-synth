@@ -1,0 +1,7 @@
+{
+  "files.associations": {
+    "*.mmd": "mermaid",
+    "*.mermaid": "mermaid"
+  },
+  "markdown.preview.breaks": true
+}

@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+filter_renv_noise() {
+  awk '
+    BEGIN { skip = 0 }
+    {
+      if ($0 ~ /^The following package\(s\) are missing entries in the cache:/) {
+        skip = 1
+        next
+      }
+      if ($0 ~ /^The following package\(s\) have broken symlinks into the cache:/) {
+        skip = 2
+        next
+      }
+      if (skip == 1 && $0 ~ /^These packages will need to be reinstalled\./) {
+        skip = 0
+        next
+      }
+      if (skip == 2 && $0 ~ /^Use `renv::repair\(\)` to try and reinstall these packages\./) {
+        skip = 0
+        next
+      }
+      if ($0 ~ /^- One or more packages recorded in the lockfile are not installed\./) next
+      if ($0 ~ /^- Use `renv::status\(\)` for more details\./) next
+      if (skip == 0) print
+    }
+  '
+}
+
+run_rscript_filtered() {
+  local output status
+  output="$(Rscript "$@" 2>&1)"
+  status=$?
+  printf "%s\n" "$output" | filter_renv_noise
+  return "$status"
+}
+
+if [[ "${SKIP_ANALYST_HOOKS:-}" == "1" ]]; then
+  echo "[pre-commit] SKIP_ANALYST_HOOKS=1 set; skipping analyst hooks."
+  exit 0
+fi
+
+if ! command -v Rscript >/dev/null 2>&1; then
+  echo "[pre-commit] Rscript not found; skipping analyst checks."
+  exit 0
+fi
+
+staged_files="$(git diff --cached --name-only)"
+
+if echo "$staged_files" | grep -Eq '^(study_params\.yaml|cohorts/.*\.sql|covariates/.*\.csv)$'; then
+  echo "[pre-commit] Running setup pre-flight check (scripts/check_setup.R)..."
+  run_rscript_filtered scripts/check_setup.R
+fi
+
+echo "[pre-commit] Scanning TODO placeholders (non-blocking)..."
+if [[ -n "$staged_files" ]]; then
+  mapfile -t staged_array < <(printf "%s\n" "$staged_files" | sed '/^$/d')
+  if [[ ${#staged_array[@]} -gt 0 ]]; then
+    run_rscript_filtered scripts/find_todos.R --files "${staged_array[@]}" || true
+  else
+    echo "[pre-commit] No staged files found for TODO scan."
+  fi
+else
+  echo "[pre-commit] No staged files found for TODO scan."
+fi
+
+echo "[pre-commit] Complete."

@@ -1,0 +1,14 @@
+# Repository-wide default owner
+* @adam-mdmph
+
+# Canonical documentation sources and governance checks
+/README.md @adam-mdmph
+/CHECKLIST.md @adam-mdmph
+/docs/GETTING_STARTED.md @adam-mdmph
+/docs/COMMANDS.md @adam-mdmph
+/docs/workflow_steps.yaml @adam-mdmph
+/docs/TOPIC_OWNERSHIP.csv @adam-mdmph
+/scripts/validate_docs_commands.R @adam-mdmph
+/scripts/generate_checklist_step_index.R @adam-mdmph
+/.githooks/pre-commit @adam-mdmph
+/.github/workflows/ci.yml @adam-mdmph

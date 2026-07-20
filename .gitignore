@@ -1,0 +1,73 @@
+# R
+.Rhistory
+.Rdata
+.httr-oauth
+.DS_Store
+
+# renv (track renv.lock but not the library)
+renv/library/
+renv/staging/
+renv/python/
+
+# Output folders (large artifacts)
+output/
+plp_output/
+results/
+
+# JDBC driver bundle – exclude extracted files and the runtime jar, but keep
+# the downloaded zip so re-extraction can run without re-downloading.
+drivers/sqljdbc_13.2/
+drivers/jdbc-runtime/
+drivers/synthea-sanitized/
+drivers/etl-checkpoints/
+
+# R session data
+*.RData
+*.Rproj.user/
+
+# Temporary files
+*.tmp
+*.log
+
+# OMOP Vocabulary CSV files — not licensed for redistribution.
+# The vocab lives outside the repo in OMOP_Dev/omop_vocab/ but exclude
+# any accidental copies or symlinks within the repo too.
+omop_vocab/
+**/CONCEPT.csv
+**/CONCEPT_ANCESTOR.csv
+**/CONCEPT_CLASS.csv
+**/CONCEPT_RELATIONSHIP.csv
+**/CONCEPT_SYNONYM.csv
+**/DOMAIN.csv
+**/DRUG_STRENGTH.csv
+**/RELATIONSHIP.csv
+**/VOCABULARY.csv
+
+# Generated error reports from DatabaseConnector
+errorReportSql.txt
+errorReportR.txt
+
+# JAAS config — generated at runtime by R/connection.R; contains local paths
+jaas.conf
+
+# Portable bundle — has its own git repo targeting institutional GitLab;
+# managed by workflow/09_build_portable_analysis_bundle.sh, not tracked here.
+# The bundle's config.R contains site-specific server/schema names and must
+# never be committed to the public GitHub repo.
+portable/
+
+# external/synthea is tracked as a git submodule via .gitmodules — not ignored here
+# (new_study.R registers the submodule during study initialization)
+
+# Generated portable bundle archives
+dist/*.zip
+
+# Institution-specific environment variables — never commit
+.env
+
+
+# Claude Code session files
+.claude/
+
+# Step execution diagnostic logs (machine-local, regenerated on each run)
+logs/

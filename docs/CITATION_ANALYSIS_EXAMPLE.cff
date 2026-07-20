@@ -1,0 +1,37 @@
+cff-version: 1.2.0
+message: >
+  If you use this analysis repository in your research, please cite it using the
+  metadata below.
+
+title: "[Study Name] Analysis Code"
+authors:
+  - given-names: "[First]"
+    family-names: "[Last]"
+    affiliation: "[Institution]"
+    email: "[email@org.edu]"
+  - given-names: "[Coauthor First]"
+    family-names: "[Coauthor Last]"
+    affiliation: "[Institution]"
+
+version: "0.1.0"
+date-released: "YYYY-MM-DD"
+repository-code: "https://github.com/<org>/<study-repo>"
+url: "https://github.com/<org>/<study-repo>"
+license: "GPL-3.0"
+
+abstract: >
+  Analysis code for [Study Name], developed from the OMOP Study Template for
+  observational analyses on OMOP CDM data.
+
+keywords:
+  - OMOP CDM
+  - OHDSI
+  - observational study
+  - real-world evidence
+
+references:
+  - type: software
+    title: "OMOP Study Template"
+    authors:
+      - name: "OMOP Study Template Contributors"
+    url: "https://github.com/adam-mdmph/synthea-omop-template"

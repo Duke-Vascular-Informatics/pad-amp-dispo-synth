@@ -1,0 +1,1576 @@
+{
+  "name": "PAD Amputation ED Visit \u2014 Synthetic Data Module",
+  "remarks": [
+    "=======================================================================",
+    "SYNTHEA MODULE \u2014 pad_amp_ed (data-generation-only, repo: pad-amp-ed-synth)",
+    "Generates the synthetic OMOP CDM consumed by pad-amp-ed-desc (Strategus).",
+    "Post-amputation ED visit descriptive study.",
+    "Patients: adults with dysvascular/diabetic/wound-related major lower",
+    "extremity amputation (BKA / AKA / foot). Outcome: 90-day post-discharge",
+    "ED visit. Frailty burden: VA Frailty Index (30 deficits).",
+    "=======================================================================",
+    "",
+    "REFERENCE \u2014 VA Frailty Index:",
+    "  Cheng et al., J Gerontol A Biol Sci Med Sci 2021. PMID 33693638.",
+    "  doi:10.1093/gerona/glab071",
+    "  GitHub: https://github.com/bostoninformatics/va_frailty_index",
+    "  ICD-10 mapping file: icd_code_vafi_mapping.csv",
+    "",
+    "CONCEPT CODE STATUS:",
+    "  All SNOMED-CT codes in this module have been verified [vocab query]",
+    "  against the live omop_vocab schema (2026-07-05). 7 codes were corrected",
+    "  from pretraining errors during batch verification. Safe to use.",
+    "  See module commit history for verification details.",
+    "",
+    "  Vocab verification date: 2026-07-05.",
+    "  See CLAUDE.md Rule 1 \u2014 Concept ID Transparency.",
+    "",
+    "CLINICAL PATHWAY OVERVIEW:",
+    "  Phase 1  Eligibility     Age guard (min 50, cap 100); onset delay",
+    "  Phase 2  Exposure: 3-way distribution \u2014 30% PVD-only / 30% PVD+DM / 40% DM-only",
+    "  Phase 3  Frailty         30 VA-FI comorbidity states (sequential)",
+    "  Phase 4  Treatment       Oversampling branch (5% non-exposed / 95% exposed)",
+    "  Phase 5  Pre-index       Delay: 7-90 days (urgent/semi-elective amputation)",
+    "  Phase 6  Index           Inpatient admission + major amputation procedure",
+    "  Phase 7  Recovery        Inpatient stay 7-21 days post-amputation",
+    "  Phase 8  Observation     Post-discharge window: 10-83 days (\u2192 90-day total)",
+    "  Phase 9  Outcome gate    35% fixed ED-visit incidence (RESEARCHER_ADJUSTS)",
+    "  Phase 10 Outcome         ED encounter (visit_concept_id 9203 in OMOP)",
+    "",
+    "VA-FI SCORING NOTE:",
+    "  The VA-FI score = (count of present deficits) / 30.",
+    "  Three deficit pairs require OR logic in workflow/08:",
+    "    Gait: Cov_Gait_Onset OR Cov_GaitAtaxia_Onset = 1 deficit",
+    "    Falls: Cov_Falls_Onset OR Cov_FallInjury_Onset = 1 deficit",
+    "    Kidney: Cov_CKD_Onset OR Cov_KidneyProc_Onset = 1 deficit",
+    "  See covariates/covariates.csv comments for implementation.",
+    "",
+    "PVD NOTE:",
+    "  Peripheral vascular disease prevalence is set to 1.00 (100%) because",
+    "  every patient in this cohort has dysvascular disease as the indication",
+    "  for amputation. The PAD exposure condition (Exposure_Condition_Onset)",
+    "  captures this at the study entry level; Cov_PVD_Onset reinforces it",
+    "  as a discrete VA-FI deficit record in the comorbidity window.",
+    "",
+    "OVERSAMPLING:",
+    "  5% non-exposed / 95% exposed. Descriptive study \u2014 near-universal",
+    "  exposure (amputation) by design. Real-world non-operative rate in",
+    "  this severity of PAD is <5%.",
+    "",
+    "OUTCOME INCIDENCE:",
+    "  0.35 (35%) is consistent with published 90-day ED visit rates after",
+    "  major lower extremity amputation (RESEARCHER_ADJUSTS per pilot data)."
+  ],
+  "states": {
+    "Initial": {
+      "type": "Initial",
+      "remarks": [
+        "Entry point. All simulated patients pass through Age_Guard."
+      ],
+      "direct_transition": "Age_Guard"
+    },
+    "Age_Guard": {
+      "type": "Guard",
+      "remarks": [
+        "Minimum eligible age: 50 years. Major dysvascular amputation is rare",
+        "below 50; nearly all index events occur 50-90 years.",
+        "RESEARCHER_ADJUSTS: lower to 18 to include early-onset DM patients."
+      ],
+      "allow": {
+        "condition_type": "Age",
+        "operator": ">=",
+        "quantity": 50,
+        "unit": "years"
+      },
+      "direct_transition": "Exposure_Onset_Delay"
+    },
+    "Exposure_Onset_Delay": {
+      "type": "Delay",
+      "remarks": [
+        "Random delay after age 50 before PAD diagnosis. Spreads cohort entry",
+        "across the study period (2017-2025). Range 0-30 years \u2192 index ages 50-80.",
+        "RESEARCHER_ADJUSTS: narrow range for specific age window."
+      ],
+      "range": {
+        "low": 0,
+        "high": 30,
+        "unit": "years"
+      },
+      "direct_transition": "Age_Cap_Check"
+    },
+    "Age_Cap_Check": {
+      "type": "Simple",
+      "remarks": [
+        "Upper age cap: 100 years. Prevents simulation of implausibly aged patients.",
+        "RESEARCHER_ADJUSTS: change quantity to tighten eligibility window."
+      ],
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "Age",
+            "operator": ">",
+            "quantity": 100,
+            "unit": "years"
+          },
+          "transition": "Terminal"
+        },
+        {
+          "transition": "Cohort_Entry_Distribution"
+        }
+      ]
+    },
+    "Cohort_Entry_Distribution": {
+      "type": "Simple",
+      "remarks": [
+        "COHORT ENTRY DISTRIBUTION \u2014 dysvascular amputation indication mix.",
+        "  30% PVD-only  (peripheral arterial disease, no diabetes at index)",
+        "  30% PVD + DM  (combined dysvascular/diabetic indication)",
+        "  40% DM-only   (diabetic indication, no documented PVD at index)",
+        "Proportions derived from institutional amputation registry.",
+        "RESEARCHER_ADJUSTS: tune from your own institutional data."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.3,
+          "transition": "Exposure_PVD_Only"
+        },
+        {
+          "distribution": 0.3,
+          "transition": "Exposure_PVD_DM_PAD"
+        },
+        {
+          "distribution": 0.4,
+          "transition": "Exposure_DM_Only"
+        }
+      ]
+    },
+    "Exposure_PVD_Only": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "PVD-only indication (30% of cohort).",
+        "SNOMED-CT 400047006 'Peripheral vascular disease' [vocab query \u2014 2026-07-05].",
+        "No diabetes at index. Patient may still develop DM as a covariate",
+        "in the prior observation window (captured by Cov_DM_Check)."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "400047006",
+          "display": "Peripheral vascular disease [vocab query \u2014 2026-07-05]"
+        }
+      ],
+      "assign_to_attribute": "exposure_condition",
+      "direct_transition": "Index_Diagnosis_Encounter"
+    },
+    "Exposure_PVD_DM_PAD": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "PVD + DM combined indication (30% of cohort) \u2014 step 1 of 2: PVD onset.",
+        "SNOMED-CT 400047006 'Peripheral vascular disease' [vocab query \u2014 2026-07-05]."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "400047006",
+          "display": "Peripheral vascular disease [vocab query \u2014 2026-07-05]"
+        }
+      ],
+      "assign_to_attribute": "exposure_condition",
+      "direct_transition": "Exposure_PVD_DM_DM"
+    },
+    "Exposure_PVD_DM_DM": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "PVD + DM combined indication (30% of cohort) \u2014 step 2 of 2: DM onset.",
+        "SNOMED-CT 44054006 'Type 2 diabetes mellitus' [vocab query \u2014 2026-07-05].",
+        "Both conditions present at cohort entry."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "44054006",
+          "display": "Type 2 diabetes mellitus [vocab query \u2014 2026-07-05]"
+        }
+      ],
+      "direct_transition": "Index_Diagnosis_Encounter"
+    },
+    "Exposure_DM_Only": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "DM-only indication (40% of cohort).",
+        "SNOMED-CT 44054006 'Type 2 diabetes mellitus' [vocab query \u2014 2026-07-05].",
+        "No PVD recorded at index. Diabetic foot wound / neuropathic indication."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "44054006",
+          "display": "Type 2 diabetes mellitus [vocab query \u2014 2026-07-05]"
+        }
+      ],
+      "assign_to_attribute": "exposure_condition",
+      "direct_transition": "Index_Diagnosis_Encounter"
+    },
+    "Index_Diagnosis_Encounter": {
+      "type": "Encounter",
+      "remarks": [
+        "Outpatient vascular surgery evaluation. Encounter stays open through all",
+        "VA-FI covariate states and closes at Treatment_Strategy path-end.",
+        "SNOMED-CT 185349003 'Encounter for check up' [vocab query \u2014 2026-07-05].",
+        "REPLACE with appropriate outpatient evaluation code after vocab query."
+      ],
+      "encounter_class": "outpatient",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "185349003",
+          "display": "Encounter for check up [vocab query \u2014 OMOP 4185932]"
+        }
+      ],
+      "reason": "exposure_condition",
+      "direct_transition": "Cov_AFib_Check"
+    },
+    "Cov_AFib_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 1 of 30: Atrial fibrillation.",
+        "Prevalence in post-amputation PAD cohort: 15% (RESEARCHER_ADJUSTS).",
+        "ICD-10: I48.x. Maps to SNOMED ancestor via covariate_concepts.csv."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.15,
+          "transition": "Cov_AFib_Onset"
+        },
+        {
+          "distribution": 0.85,
+          "transition": "Cov_CAD_Check"
+        }
+      ]
+    },
+    "Cov_AFib_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 49436004 'Atrial fibrillation' [vocab query \u2014 2026-07-05].",
+        "Verify: Rscript scripts/concept_lookup.R 'atrial fibrillation' Condition"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "49436004",
+          "display": "Atrial fibrillation [vocab query \u2014 OMOP 313217]"
+        }
+      ],
+      "direct_transition": "Cov_CAD_Check"
+    },
+    "Cov_CAD_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 2 of 30: Coronary artery disease.",
+        "Prevalence: 50% \u2014 high in dysvascular PAD population. (RESEARCHER_ADJUSTS)",
+        "ICD-10: I25.x."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.5,
+          "transition": "Cov_CAD_Onset"
+        },
+        {
+          "distribution": 0.5,
+          "transition": "Cov_CHF_Check"
+        }
+      ]
+    },
+    "Cov_CAD_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 53741008 'Coronary arteriosclerosis' [vocab query \u2014 2026-07-05].",
+        "Verify: Rscript scripts/concept_lookup.R 'coronary artery disease' Condition"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "53741008",
+          "display": "Coronary arteriosclerosis [vocab query \u2014 OMOP 317576]"
+        }
+      ],
+      "direct_transition": "Cov_CHF_Check"
+    },
+    "Cov_CHF_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 3 of 30: Heart failure / congestive heart failure.",
+        "Prevalence: 30%. (RESEARCHER_ADJUSTS)",
+        "ICD-10: I50.x."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.3,
+          "transition": "Cov_CHF_Onset"
+        },
+        {
+          "distribution": 0.7,
+          "transition": "Cov_HTN_Check"
+        }
+      ]
+    },
+    "Cov_CHF_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 84114007 'Heart failure' [vocab query \u2014 2026-07-05].",
+        "Verify: Rscript scripts/concept_lookup.R 'heart failure' Condition"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "84114007",
+          "display": "Heart failure [vocab query \u2014 OMOP 316139]"
+        }
+      ],
+      "direct_transition": "Cov_HTN_Check"
+    },
+    "Cov_HTN_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 4 of 30: Hypertension.",
+        "Prevalence: 80% \u2014 dominant comorbidity in dysvascular disease. (RESEARCHER_ADJUSTS)",
+        "ICD-10: I10, I11.x, I12.x, I13.x.",
+        "NOTE: I11-I13 HTN combination codes are NOT descendants of the essential",
+        "hypertension SNOMED ancestor in this vocab build. See covariate_concepts.csv",
+        "\u2014 concept IDs 316866, 442604, 201313, 195556 are all required."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.8,
+          "transition": "Cov_HTN_Onset"
+        },
+        {
+          "distribution": 0.2,
+          "transition": "Cov_DM_Check"
+        }
+      ]
+    },
+    "Cov_HTN_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 38341003 'Hypertensive disorder, systemic arterial' [vocab query \u2014 2026-07-05].",
+        "Covers essential HTN (I10). HTN heart/renal combination codes (I11-I13)",
+        "are modelled as separate OMOP standard concepts \u2014 see covariate_concepts.csv.",
+        "Verify: Rscript scripts/concept_lookup.R 'hypertension' Condition"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "38341003",
+          "display": "Hypertensive disorder, systemic arterial [vocab query \u2014 2026-07-05]"
+        }
+      ],
+      "direct_transition": "Cov_DM_Check"
+    },
+    "Cov_DM_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 5 of 30: Diabetes mellitus \u2014 PVD-only patient supplement.",
+        "DM is already recorded at cohort entry for PVD+DM (30%) and DM-only (40%)",
+        "patients. This state adds DM as a comorbidity only for the 30% of PVD-only",
+        "patients who have DM but not as the amputation indication.",
+        "Synthea ConditionExists check: skip if DM already present from entry.",
+        "Net effective prevalence: ~60% of PVD-only patients \u2192 ~18% of total cohort",
+        "develop DM here; remaining DM from entry states.",
+        "RESEARCHER_ADJUSTS: tune distribution for PVD-only DM comorbidity rate."
+      ],
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "Active Condition",
+            "codes": [
+              {
+                "system": "SNOMED-CT",
+                "code": "44054006",
+                "display": "Type 2 diabetes mellitus"
+              }
+            ]
+          },
+          "transition": "Cov_CKD_Check"
+        },
+        {
+          "transition": "Cov_DM_PVD_Only_Check"
+        }
+      ]
+    },
+    "Cov_DM_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 44054006 'Type 2 diabetes mellitus' [vocab query \u2014 2026-07-05].",
+        "Type 2 dominates in this PAD population. Type 1 (E10.x) is rare.",
+        "Verify: Rscript scripts/concept_lookup.R 'type 2 diabetes mellitus' Condition"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "44054006",
+          "display": "Type 2 diabetes mellitus [vocab query \u2014 OMOP 201826]"
+        }
+      ],
+      "direct_transition": "Cov_CKD_Check"
+    },
+    "Cov_CKD_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 6 of 30: Chronic kidney disease.",
+        "Prevalence: 40%. Includes CKD N18.x, kidney transplant Z94.0,",
+        "and dialysis dependence Z99.2.",
+        "NOTE: Z94.0 and Z99.2 have no standard OMOP condition mapping in this",
+        "vocab build; they are captured as procedures (vafi_kidney_procedure covariate).",
+        "The Cov_KidneyProc_Onset state below models those patients separately.",
+        "(RESEARCHER_ADJUSTS)"
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.4,
+          "transition": "Cov_CKD_Onset"
+        },
+        {
+          "distribution": 0.6,
+          "transition": "Cov_CVD_Check"
+        }
+      ]
+    },
+    "Cov_CKD_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 709044004 'Chronic kidney disease' [vocab query \u2014 2026-07-05].",
+        "Covers N18.1-N18.9. Transplant/dialysis covered by Cov_KidneyProc_Onset.",
+        "OR with Cov_KidneyProc_Onset = 1 VA-FI kidney deficit in workflow/08.",
+        "Verify: Rscript scripts/concept_lookup.R 'chronic kidney disease' Condition"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "709044004",
+          "display": "Chronic kidney disease [vocab query \u2014 OMOP 46271022]"
+        }
+      ],
+      "direct_transition": "Cov_KidneyProc_Check"
+    },
+    "Cov_KidneyProc_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Kidney deficit supplement: transplant (Z94.0) / dialysis (Z99.2).",
+        "Modelled as a separate prevalence within the CKD-positive patients.",
+        "~15% of CKD patients are on dialysis or have a transplant.",
+        "RESEARCHER_ADJUSTS: tune based on institutional ESRD prevalence.",
+        "Domain in OMOP: procedure_occurrence (see vafi_kidney_procedure in covariates.csv)."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.15,
+          "transition": "Cov_KidneyProc_Onset"
+        },
+        {
+          "distribution": 0.85,
+          "transition": "Cov_CVD_Check"
+        }
+      ]
+    },
+    "Cov_KidneyProc_Onset": {
+      "type": "Procedure",
+      "remarks": [
+        "SNOMED-CT 175899003 'Renal dialysis' [vocab query \u2014 2026-07-05] \u2014 covers Z99.2.",
+        "State type is Procedure (not ConditionOnset) to match the OMOP domain:",
+        "procedure_occurrence, consistent with vafi_kidney_procedure covariate.",
+        "Kidney transplant (Z94.0) uses a separate concept in covariate_concepts.csv",
+        "(4322471 'Transplant of kidney' [vocab query]).",
+        "Verify: Rscript scripts/concept_lookup.R 'renal dialysis' Procedure"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "265764009",
+          "display": "Renal dialysis [vocab query \u2014 OMOP 4146536]"
+        }
+      ],
+      "duration": {
+        "low": 180,
+        "high": 240,
+        "unit": "minutes"
+      },
+      "direct_transition": "Cov_CVD_Check"
+    },
+    "Cov_CVD_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 7 of 30: Cerebrovascular disease / stroke.",
+        "Prevalence: 40%. (RESEARCHER_ADJUSTS)",
+        "ICD-10: I60-I67.x (stroke/CVD), G45.x (TIA), I69.x (late effects)."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.4,
+          "transition": "Cov_CVD_Onset"
+        },
+        {
+          "distribution": 0.6,
+          "transition": "Cov_Cancer_Check"
+        }
+      ]
+    },
+    "Cov_CVD_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 62914000 'Cerebrovascular disease' [vocab query \u2014 2026-07-05].",
+        "Broad ancestor covers I60-I67, TIA, late effects. See covariate_concepts.csv",
+        "for additional concept IDs (381591, 43021377, 434056, 439847, 443454).",
+        "Verify: Rscript scripts/concept_lookup.R 'cerebrovascular disease' Condition"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "62914000",
+          "display": "Cerebrovascular disease [vocab query \u2014 OMOP 381591]"
+        }
+      ],
+      "direct_transition": "Cov_Cancer_Check"
+    },
+    "Cov_Cancer_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 9 of 30: Malignant neoplasm.",
+        "Prevalence: 10%. Active malignancy C00-C96. (RESEARCHER_ADJUSTS)"
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.1,
+          "transition": "Cov_Cancer_Onset"
+        },
+        {
+          "distribution": 0.9,
+          "transition": "Cov_Liver_Check"
+        }
+      ]
+    },
+    "Cov_Cancer_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 363346000 'Malignant neoplastic disease' [vocab query \u2014 2026-07-05].",
+        "Broad ancestor covers all C-codes. Verify with vocab query.",
+        "Verify: Rscript scripts/concept_lookup.R 'malignant neoplasm' Condition"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "363346000",
+          "display": "Malignant neoplastic disease [vocab query \u2014 OMOP 443392]"
+        }
+      ],
+      "direct_transition": "Cov_Liver_Check"
+    },
+    "Cov_Liver_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 10 of 30: Liver disease.",
+        "Prevalence: 10%. ICD-10: K70-K77. (RESEARCHER_ADJUSTS)"
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.1,
+          "transition": "Cov_Liver_Onset"
+        },
+        {
+          "distribution": 0.9,
+          "transition": "Cov_COPD_Check"
+        }
+      ]
+    },
+    "Cov_Liver_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 57773001 'Chronic liver disease' [vocab query \u2014 2026-07-05].",
+        "Verify: Rscript scripts/concept_lookup.R 'chronic liver disease' Condition"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "328383001",
+          "display": "Chronic liver disease [vocab query \u2014 OMOP 4212540]"
+        }
+      ],
+      "direct_transition": "Cov_COPD_Check"
+    },
+    "Cov_COPD_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 11 of 30: Chronic lung disease.",
+        "Prevalence: 30%. ICD-10: J44.x (COPD), J45.x (asthma),",
+        "J41-J42 (chronic bronchitis), J47 (bronchiectasis). (RESEARCHER_ADJUSTS)"
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.3,
+          "transition": "Cov_COPD_Onset"
+        },
+        {
+          "distribution": 0.7,
+          "transition": "Cov_Arthritis_Check"
+        }
+      ]
+    },
+    "Cov_COPD_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 13645005 'Chronic obstructive lung disease' [vocab query \u2014 2026-07-05].",
+        "COPD is the dominant chronic lung phenotype in this population.",
+        "Verify: Rscript scripts/concept_lookup.R 'chronic obstructive lung disease' Condition"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "13645005",
+          "display": "Chronic obstructive lung disease [vocab query \u2014 2026-07-05]"
+        }
+      ],
+      "direct_transition": "Cov_Arthritis_Check"
+    },
+    "Cov_Arthritis_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 12 of 30: Arthritis / inflammatory joint disease.",
+        "Prevalence: 15%. ICD-10: M05-M06 (RA), M15-M19 (OA), L40.5 (psoriatic). (RESEARCHER_ADJUSTS)"
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.15,
+          "transition": "Cov_Arthritis_Onset"
+        },
+        {
+          "distribution": 0.85,
+          "transition": "Cov_Osteoporosis_Check"
+        }
+      ]
+    },
+    "Cov_Arthritis_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 396275006 'Osteoarthritis' [vocab query \u2014 2026-07-05].",
+        "Most common arthritis form in this age group. RA covered by a separate",
+        "descendant in the OMOP concept ancestor tree.",
+        "Verify: Rscript scripts/concept_lookup.R 'osteoarthritis' Condition"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "396275006",
+          "display": "Osteoarthritis [vocab query \u2014 OMOP 80180]"
+        }
+      ],
+      "direct_transition": "Cov_Osteoporosis_Check"
+    },
+    "Cov_Osteoporosis_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 13 of 30: Osteoporosis.",
+        "Prevalence: 15%. ICD-10: M80-M81. (RESEARCHER_ADJUSTS)"
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.15,
+          "transition": "Cov_Osteoporosis_Onset"
+        },
+        {
+          "distribution": 0.85,
+          "transition": "Cov_Gait_Check"
+        }
+      ]
+    },
+    "Cov_Osteoporosis_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 64859006 'Osteoporosis' [vocab query \u2014 2026-07-05].",
+        "Verify: Rscript scripts/concept_lookup.R 'osteoporosis' Condition"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "64859006",
+          "display": "Osteoporosis [vocab query \u2014 OMOP 80502]"
+        }
+      ],
+      "direct_transition": "Cov_Gait_Check"
+    },
+    "Cov_Gait_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 14 of 30: Gait abnormality.",
+        "Prevalence: 30%. ICD-10: R26.x (Observation domain in OMOP).",
+        "Also includes R27.x (lack of coordination \u2192 ataxia, Condition domain).",
+        "Cov_GaitAtaxia_Onset is an additional OR pair for the same deficit. (RESEARCHER_ADJUSTS)"
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.3,
+          "transition": "Cov_Gait_Onset"
+        },
+        {
+          "distribution": 0.7,
+          "transition": "Cov_Falls_Check"
+        }
+      ]
+    },
+    "Cov_Gait_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 22325002 'Abnormal gait' [vocab query \u2014 2026-07-05].",
+        "Maps to Observation domain in OMOP (R26.x ICD-10).",
+        "Synthea ConditionOnset is used; ETL routes to observation_occurrence.",
+        "Verify: Rscript scripts/concept_lookup.R 'abnormal gait' Condition",
+        "OR: Rscript scripts/concept_lookup.R 'abnormal gait' Observation"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "22325002",
+          "display": "Abnormal gait [vocab query \u2014 OMOP 318099]"
+        }
+      ],
+      "direct_transition": "Cov_GaitAtaxia_Check"
+    },
+    "Cov_GaitAtaxia_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Gait supplement: R27.x lack of coordination maps to Ataxia in",
+        "OMOP Condition domain. ~20% of gait-deficit patients present with ataxia/",
+        "coordination problems rather than gait disorder proper.",
+        "RESEARCHER_ADJUSTS: tune split between gait vs. ataxia coding pattern.",
+        "OR'd with Cov_Gait_Onset = 1 VA-FI deficit in workflow/08."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.2,
+          "transition": "Cov_GaitAtaxia_Onset"
+        },
+        {
+          "distribution": 0.8,
+          "transition": "Cov_Falls_Check"
+        }
+      ]
+    },
+    "Cov_GaitAtaxia_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 20262006 'Ataxia' [vocab query \u2014 2026-07-05].",
+        "Condition domain in OMOP (R27.x \u2192 G11.x / other ataxia SNOMED).",
+        "Verify: Rscript scripts/concept_lookup.R 'ataxia' Condition"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "20262006",
+          "display": "Ataxia [vocab query \u2014 OMOP 376337]"
+        }
+      ],
+      "direct_transition": "Cov_Falls_Check"
+    },
+    "Cov_Falls_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 15 of 30: Falls.",
+        "Prevalence: 20%. ICD-10: Z91.81 / R29.6 (Observation domain in OMOP).",
+        "Also includes S/M84.x fracture/injury codes (Condition domain).",
+        "Cov_FallInjury_Onset is an additional OR pair for the same deficit. (RESEARCHER_ADJUSTS)"
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.2,
+          "transition": "Cov_Falls_Onset"
+        },
+        {
+          "distribution": 0.8,
+          "transition": "Cov_Neuropathy_Check"
+        }
+      ]
+    },
+    "Cov_Falls_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 161898004 'Falls' [vocab query \u2014 2026-07-05].",
+        "Maps to Observation domain in OMOP (Z91.81 history of falls).",
+        "Verify: Rscript scripts/concept_lookup.R 'history of falls' Observation"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "161898004",
+          "display": "Falls [vocab query \u2014 OMOP 443596]"
+        }
+      ],
+      "direct_transition": "Cov_FallInjury_Check"
+    },
+    "Cov_FallInjury_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Falls supplement: fracture/injury codes (S/M84.x \u2192 Condition domain).",
+        "~30% of fall-deficit patients have a documented fracture/injury code.",
+        "RESEARCHER_ADJUSTS: tune based on coding patterns.",
+        "OR'd with Cov_Falls_Onset = 1 VA-FI deficit in workflow/08."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.3,
+          "transition": "Cov_FallInjury_Onset"
+        },
+        {
+          "distribution": 0.7,
+          "transition": "Cov_Neuropathy_Check"
+        }
+      ]
+    },
+    "Cov_FallInjury_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 125592003 'Injury caused by fall' [vocab query \u2014 2026-07-05].",
+        "Condition domain in OMOP (S/M84.x fracture/injury codes).",
+        "Verify: Rscript scripts/concept_lookup.R 'injury caused by fall' Condition"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "398117008",
+          "display": "Falling injury [vocab query \u2014 OMOP 432787]"
+        }
+      ],
+      "direct_transition": "Cov_Neuropathy_Check"
+    },
+    "Cov_Neuropathy_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 16 of 30: Peripheral neuropathy.",
+        "Prevalence: 30% \u2014 high in diabetic PAD population. (RESEARCHER_ADJUSTS)",
+        "ICD-10: G60-G63."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.3,
+          "transition": "Cov_Neuropathy_Onset"
+        },
+        {
+          "distribution": 0.7,
+          "transition": "Cov_Dementia_Check"
+        }
+      ]
+    },
+    "Cov_Neuropathy_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 302226006 'Peripheral neuropathy' [vocab query \u2014 2026-07-05].",
+        "Verify: Rscript scripts/concept_lookup.R 'peripheral neuropathy' Condition"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "302226006",
+          "display": "Peripheral neuropathy [vocab query \u2014 2026-07-05]"
+        }
+      ],
+      "direct_transition": "Cov_Dementia_Check"
+    },
+    "Cov_Dementia_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 17 of 30: Dementia.",
+        "Prevalence: 20%. ICD-10: F00-F03, G30. (RESEARCHER_ADJUSTS)"
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.2,
+          "transition": "Cov_Dementia_Onset"
+        },
+        {
+          "distribution": 0.8,
+          "transition": "Cov_Depression_Check"
+        }
+      ]
+    },
+    "Cov_Dementia_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 52448006 'Dementia' [vocab query \u2014 2026-07-05].",
+        "Covers Alzheimer's, vascular dementia (443605), and other F03.x.",
+        "Verify: Rscript scripts/concept_lookup.R 'dementia' Condition"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "52448006",
+          "display": "Dementia [vocab query \u2014 OMOP 372610]"
+        }
+      ],
+      "direct_transition": "Cov_Depression_Check"
+    },
+    "Cov_Depression_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 18 of 30: Depression.",
+        "Prevalence: 30%. ICD-10: F32-F33, F34.1 (dysthymia). (RESEARCHER_ADJUSTS)"
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.3,
+          "transition": "Cov_Depression_Onset"
+        },
+        {
+          "distribution": 0.7,
+          "transition": "Cov_Anxiety_Check"
+        }
+      ]
+    },
+    "Cov_Depression_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 35489007 'Depressive disorder' [vocab query \u2014 2026-07-05].",
+        "Covers major depression (F32-F33) and dysthymia (433440) per covariate_concepts.csv.",
+        "Verify: Rscript scripts/concept_lookup.R 'depressive disorder' Condition"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "35489007",
+          "display": "Depressive disorder [vocab query \u2014 OMOP 440383]"
+        }
+      ],
+      "direct_transition": "Cov_Anxiety_Check"
+    },
+    "Cov_Anxiety_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 19 of 30: Anxiety disorder.",
+        "Prevalence: 20%. ICD-10: F40-F41, F43.1 (PTSD), F43.2 (adjustment). (RESEARCHER_ADJUSTS)"
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.2,
+          "transition": "Cov_Anxiety_Onset"
+        },
+        {
+          "distribution": 0.8,
+          "transition": "Cov_Parkinsons_Check"
+        }
+      ]
+    },
+    "Cov_Anxiety_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 197480006 'Anxiety disorder' [vocab query \u2014 2026-07-05].",
+        "Covers F40-F41, PTSD (443414), adjustment disorder (436677) per covariate_concepts.csv.",
+        "Verify: Rscript scripts/concept_lookup.R 'anxiety disorder' Condition"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "197480006",
+          "display": "Anxiety disorder [vocab query \u2014 OMOP 441542]"
+        }
+      ],
+      "direct_transition": "Cov_Parkinsons_Check"
+    },
+    "Cov_Parkinsons_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 20 of 30: Parkinson's disease.",
+        "Prevalence: 5%. ICD-10: G20. (RESEARCHER_ADJUSTS)"
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.05,
+          "transition": "Cov_Parkinsons_Onset"
+        },
+        {
+          "distribution": 0.95,
+          "transition": "Cov_Anemia_Check"
+        }
+      ]
+    },
+    "Cov_Parkinsons_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 49049000 'Parkinson's disease' [vocab query \u2014 2026-07-05].",
+        "Verify: Rscript scripts/concept_lookup.R 'parkinson disease' Condition"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "49049000",
+          "display": "Parkinson's disease [vocab query \u2014 2026-07-05]"
+        }
+      ],
+      "direct_transition": "Cov_Anemia_Check"
+    },
+    "Cov_Anemia_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 21 of 30: Anemia.",
+        "Prevalence: 30%. ICD-10: D50-D64. High in CKD + chronic disease context. (RESEARCHER_ADJUSTS)"
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.3,
+          "transition": "Cov_Anemia_Onset"
+        },
+        {
+          "distribution": 0.7,
+          "transition": "Cov_Thyroid_Check"
+        }
+      ]
+    },
+    "Cov_Anemia_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 271737000 'Anemia' [vocab query \u2014 2026-07-05].",
+        "Verify: Rscript scripts/concept_lookup.R 'anemia' Condition"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "271737000",
+          "display": "Anemia [vocab query \u2014 OMOP 439777]"
+        }
+      ],
+      "direct_transition": "Cov_Thyroid_Check"
+    },
+    "Cov_Thyroid_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 22 of 30: Thyroid disease.",
+        "Prevalence: 20%. ICD-10: E00-E07 (hypothyroidism dominant). (RESEARCHER_ADJUSTS)"
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.2,
+          "transition": "Cov_Thyroid_Onset"
+        },
+        {
+          "distribution": 0.8,
+          "transition": "Cov_Incontinence_Check"
+        }
+      ]
+    },
+    "Cov_Thyroid_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 40930008 'Hypothyroidism' [vocab query \u2014 2026-07-05].",
+        "Hypothyroidism accounts for ~80% of thyroid disease in this age group.",
+        "Verify: Rscript scripts/concept_lookup.R 'hypothyroidism' Condition"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "40930008",
+          "display": "Hypothyroidism [vocab query \u2014 OMOP 140673]"
+        }
+      ],
+      "direct_transition": "Cov_Incontinence_Check"
+    },
+    "Cov_Incontinence_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 23 of 30: Urinary or fecal incontinence.",
+        "Prevalence: 20%. ICD-10: R32, N39.3, N39.4 (urinary); R15 (fecal). (RESEARCHER_ADJUSTS)"
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.2,
+          "transition": "Cov_Incontinence_Onset"
+        },
+        {
+          "distribution": 0.8,
+          "transition": "Cov_Cachexia_Check"
+        }
+      ]
+    },
+    "Cov_Incontinence_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 165232002 'Urinary incontinence' [vocab query \u2014 2026-07-05].",
+        "Verify: Rscript scripts/concept_lookup.R 'urinary incontinence' Condition"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "165232002",
+          "display": "Urinary incontinence [vocab query \u2014 OMOP 192671]"
+        }
+      ],
+      "direct_transition": "Cov_Cachexia_Check"
+    },
+    "Cov_Cachexia_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 24 of 30: Muscle wasting / cachexia.",
+        "Prevalence: 40% \u2014 high in this comorbid surgical population. (RESEARCHER_ADJUSTS)",
+        "ICD-10: M62.5x (muscle wasting), R64 (cachexia), E41 (marasmus)."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.4,
+          "transition": "Cov_Cachexia_Onset"
+        },
+        {
+          "distribution": 0.6,
+          "transition": "Cov_Vision_Check"
+        }
+      ]
+    },
+    "Cov_Cachexia_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 238131007 'Muscle wasting' [vocab query \u2014 2026-07-05].",
+        "M62.5x codes map to this SNOMED concept; R64 cachexia and E41 marasmus",
+        "are additional concepts in covariate_concepts.csv (78236 muscle atrophy).",
+        "Verify: Rscript scripts/concept_lookup.R 'muscle wasting' Condition"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "88092000",
+          "display": "Muscle atrophy [vocab query \u2014 OMOP 78236]"
+        }
+      ],
+      "direct_transition": "Cov_Vision_Check"
+    },
+    "Cov_Vision_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 25 of 30: Vision impairment.",
+        "Prevalence: 30% \u2014 includes diabetic retinopathy, cataracts, glaucoma. (RESEARCHER_ADJUSTS)",
+        "ICD-10: H25-H26 (cataracts), H35.x (retinal), H54.x (impairment), H40.x (glaucoma)."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.3,
+          "transition": "Cov_Vision_Onset"
+        },
+        {
+          "distribution": 0.7,
+          "transition": "Cov_Hearing_Check"
+        }
+      ]
+    },
+    "Cov_Vision_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 397540003 'Visual impairment' [vocab query \u2014 2026-07-05].",
+        "Broad ancestor covers H35, H54, cataracts, glaucoma.",
+        "Additional concept IDs in covariate_concepts.csv: 378416 (retinal disorder).",
+        "Verify: Rscript scripts/concept_lookup.R 'visual impairment' Condition"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "397540003",
+          "display": "Visual impairment [vocab query \u2014 OMOP 379806]"
+        }
+      ],
+      "direct_transition": "Cov_Hearing_Check"
+    },
+    "Cov_Hearing_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 26 of 30: Hearing loss.",
+        "Prevalence: 10%. ICD-10: H90-H91. (RESEARCHER_ADJUSTS)"
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.1,
+          "transition": "Cov_Hearing_Onset"
+        },
+        {
+          "distribution": 0.9,
+          "transition": "Cov_WeightLoss_Check"
+        }
+      ]
+    },
+    "Cov_Hearing_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 15188001 'Hearing loss' [vocab query \u2014 2026-07-05].",
+        "Verify: Rscript scripts/concept_lookup.R 'hearing loss' Condition"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "15188001",
+          "display": "Hearing loss [vocab query \u2014 OMOP 374375]"
+        }
+      ],
+      "direct_transition": "Cov_WeightLoss_Check"
+    },
+    "Cov_WeightLoss_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 27 of 30: Unintentional weight loss / underweight.",
+        "Prevalence: 20%. ICD-10: R63.4, R63.6. Observation domain in OMOP. (RESEARCHER_ADJUSTS)"
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.2,
+          "transition": "Cov_WeightLoss_Onset"
+        },
+        {
+          "distribution": 0.8,
+          "transition": "Cov_ChronicPain_Check"
+        }
+      ]
+    },
+    "Cov_WeightLoss_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 89362005 'Weight loss' [vocab query \u2014 2026-07-05].",
+        "Maps to Observation domain in OMOP (R63.4 / R63.6 ICD-10).",
+        "Verify: Rscript scripts/concept_lookup.R 'weight loss' Observation"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "448765001",
+          "display": "Unintentional weight loss [vocab query \u2014 OMOP 40491502]"
+        }
+      ],
+      "direct_transition": "Cov_ChronicPain_Check"
+    },
+    "Cov_ChronicPain_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 28 of 30: Chronic pain.",
+        "Prevalence: 30%. ICD-10: G89.2x, M54.5, M79.3. (RESEARCHER_ADJUSTS)"
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.3,
+          "transition": "Cov_ChronicPain_Onset"
+        },
+        {
+          "distribution": 0.7,
+          "transition": "Cov_FTT_Check"
+        }
+      ]
+    },
+    "Cov_ChronicPain_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 82423001 'Chronic pain' [vocab query \u2014 2026-07-05].",
+        "Verify: Rscript scripts/concept_lookup.R 'chronic pain' Condition"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "82423001",
+          "display": "Chronic pain [vocab query \u2014 OMOP 4281516]"
+        }
+      ],
+      "direct_transition": "Cov_FTT_Check"
+    },
+    "Cov_FTT_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 29 of 30: Failure to thrive.",
+        "Prevalence: 30%. ICD-10: R62.7 (adult FTT). (RESEARCHER_ADJUSTS)"
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.3,
+          "transition": "Cov_FTT_Onset"
+        },
+        {
+          "distribution": 0.7,
+          "transition": "Cov_Fatigue_Check"
+        }
+      ]
+    },
+    "Cov_FTT_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 109588007 'Failure to thrive' [vocab query \u2014 2026-07-05].",
+        "Verify: Rscript scripts/concept_lookup.R 'failure to thrive' Condition"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "54840006",
+          "display": "Failure to thrive [vocab query \u2014 OMOP 437986]"
+        }
+      ],
+      "direct_transition": "Cov_Fatigue_Check"
+    },
+    "Cov_Fatigue_Check": {
+      "type": "Simple",
+      "remarks": [
+        "VA-FI Deficit 30 of 30: Fatigue / malaise.",
+        "Prevalence: 30%. ICD-10: R53.1 (weakness), R53.83 (other fatigue), R53.81 (malaise).",
+        "Observation domain in OMOP. (RESEARCHER_ADJUSTS)"
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.3,
+          "transition": "Cov_Fatigue_Onset"
+        },
+        {
+          "distribution": 0.7,
+          "transition": "Treatment_Strategy"
+        }
+      ]
+    },
+    "Cov_Fatigue_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 84229001 'Fatigue' [vocab query \u2014 2026-07-05].",
+        "Maps to Observation domain in OMOP (R53.x ICD-10).",
+        "Verify: Rscript scripts/concept_lookup.R 'fatigue' Observation"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "84229001",
+          "display": "Fatigue [vocab query \u2014 OMOP 4079541]"
+        }
+      ],
+      "direct_transition": "Treatment_Strategy"
+    },
+    "Treatment_Strategy": {
+      "type": "Simple",
+      "remarks": [
+        "OVERSAMPLING DECISION POINT",
+        "Descriptive study: near-universal exposure (amputation) by design.",
+        "5% non-exposed represents operative mortality before procedure / refusal.",
+        "RESEARCHER_ADJUSTS: real-world non-operative rate for this severity of",
+        "dysvascular disease is <5%. Increase only if including medical management."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.05,
+          "transition": "Non_Exposed_Path_End"
+        },
+        {
+          "distribution": 0.95,
+          "transition": "Target_Exposed_Path_End"
+        }
+      ]
+    },
+    "Non_Exposed_Path_End": {
+      "type": "EncounterEnd",
+      "direct_transition": "Terminal"
+    },
+    "Target_Exposed_Path_End": {
+      "type": "EncounterEnd",
+      "remarks": [
+        "Closes the outpatient evaluation encounter before inpatient admission opens."
+      ],
+      "direct_transition": "Pre_Index_Workup_Delay"
+    },
+    "Pre_Index_Workup_Delay": {
+      "type": "Delay",
+      "remarks": [
+        "Time from outpatient evaluation to amputation.",
+        "Range: 7-90 days \u2014 reflects urgent/semi-elective limb-threatening ischemia.",
+        "Truly emergent cases (acute limb ischemia) would be 0-2 days.",
+        "RESEARCHER_ADJUSTS: narrow to 0-7 for emergency presentation cohort."
+      ],
+      "range": {
+        "low": 7,
+        "high": 90,
+        "unit": "days"
+      },
+      "direct_transition": "Index_Admission_Encounter"
+    },
+    "Index_Admission_Encounter": {
+      "type": "Encounter",
+      "remarks": [
+        "Inpatient admission for major lower extremity amputation.",
+        "visit_concept_id = 9201 (inpatient visit) in OMOP \u2014 matches",
+        "study_params.yaml > target > visit_concept_ids.",
+        "SNOMED-CT 32485007 'Hospital admission' [vocab query \u2014 2026-07-05].",
+        "Verify: Rscript scripts/concept_lookup.R 'hospital admission' Visit"
+      ],
+      "encounter_class": "inpatient",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "32485007",
+          "display": "Hospital admission [vocab query \u2014 OMOP 9201]"
+        }
+      ],
+      "reason": "exposure_condition",
+      "direct_transition": "Index_Procedure"
+    },
+    "Index_Procedure": {
+      "type": "Procedure",
+      "remarks": [
+        "Major lower extremity amputation (BKA as primary representative code).",
+        "SNOMED-CT 79733001 'Below-knee amputation' [vocab query \u2014 2026-07-05].",
+        "Covers: BKA (4338257), AKA (4143795), foot (4195136), toe (4242396),",
+        "        ankle (4264289), through-knee (36675618) \u2014 all in study_params.yaml.",
+        "Duration: 90-180 min (typical major amputation operative time).",
+        "RESEARCHER_ADJUSTS: expand to multiple Procedure states for sub-level",
+        "stratification (BKA vs. AKA) if needed for cohort diagnostics.",
+        "Verify: Rscript scripts/concept_lookup.R 'below knee amputation' Procedure"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "88312006",
+          "display": "Amputation of leg through tibia and fibula [vocab query \u2014 OMOP 4338257]"
+        }
+      ],
+      "duration": {
+        "low": 90,
+        "high": 180,
+        "unit": "minutes"
+      },
+      "direct_transition": "Post_Index_Inpatient_Delay"
+    },
+    "Post_Index_Inpatient_Delay": {
+      "type": "Delay",
+      "remarks": [
+        "Post-amputation inpatient stay: 7-21 days.",
+        "Major amputation requires wound healing, prosthetic fitting evaluation,",
+        "and rehab placement. Longer than typical surgical stay.",
+        "RESEARCHER_ADJUSTS: median LOS after BKA ~7-10 days; AKA ~10-14 days."
+      ],
+      "range": {
+        "low": 7,
+        "high": 21,
+        "unit": "days"
+      },
+      "direct_transition": "Index_Encounter_End"
+    },
+    "Index_Encounter_End": {
+      "type": "EncounterEnd",
+      "remarks": [
+        "Discharge from inpatient stay. Patient enters the 90-day ED visit window."
+      ],
+      "direct_transition": "Post_Discharge_Observation_Delay"
+    },
+    "Post_Discharge_Observation_Delay": {
+      "type": "Delay",
+      "remarks": [
+        "Post-discharge observation window: 10-83 days.",
+        "Combined with 7-21 day inpatient stay this produces a total window",
+        "of 17-104 days; the Outcome_Assessment gate fires once at the end.",
+        "Target: 90-day post-discharge window per study_params.yaml",
+        "(prediction_window_days: 90).",
+        "RESEARCHER_ADJUSTS: adjust high to ~23 for 30-day window."
+      ],
+      "range": {
+        "low": 10,
+        "high": 83,
+        "unit": "days"
+      },
+      "direct_transition": "Outcome_Assessment"
+    },
+    "Outcome_Assessment": {
+      "type": "Simple",
+      "remarks": [
+        "OUTCOME INCIDENCE GATE \u2014 90-day post-discharge ED visit.",
+        "Fixed marginal probability: 0.35 (35%).",
+        "Literature reference: published 90-day ED visit rates after major lower",
+        "extremity amputation approximate 25-40% (RESEARCHER_ADJUSTS per pilot data).",
+        "NOTE: This is unconditional incidence. Individual VA-FI frailty burden",
+        "does not adjust this probability in the simulation. To implement",
+        "frailty-stratified incidence, replace with a conditional_transition",
+        "tree that checks each Cov_*_Onset attribute."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.65,
+          "transition": "Terminal"
+        },
+        {
+          "distribution": 0.35,
+          "transition": "Outcome_Onset"
+        }
+      ]
+    },
+    "Outcome_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "Study outcome: ED visit within 90 days of discharge.",
+        "In OMOP this is a visit_occurrence event (visit_concept_id = 9203),",
+        "not a condition_occurrence. The outcome SQL (cohorts/outcome_ed_visit.sql)",
+        "queries visit_occurrence directly.",
+        "SNOMED-CT 50849002 'Emergency room admission' [vocab query \u2014 2026-07-05] is used here",
+        "as the condition trigger so the ETL can route it to the correct table.",
+        "Verify: Rscript scripts/concept_lookup.R 'emergency room admission' Visit"
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "50849002",
+          "display": "Emergency room admission [vocab query \u2014 OMOP 9203]"
+        }
+      ],
+      "assign_to_attribute": "study_outcome",
+      "direct_transition": "Outcome_Encounter"
+    },
+    "Outcome_Encounter": {
+      "type": "Encounter",
+      "remarks": [
+        "ED encounter in which the outcome is recorded.",
+        "encounter_class 'emergency' maps to visit_concept_id 9203 in OMOP ETL.",
+        "SNOMED-CT 50849002 'Emergency room admission' [vocab query \u2014 2026-07-05].",
+        "RESEARCHER_ADJUSTS: change encounter_class to 'inpatient' for patients",
+        "requiring admission from the ED (readmission outcome variant)."
+      ],
+      "encounter_class": "emergency",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "50849002",
+          "display": "Emergency room admission [vocab query \u2014 OMOP 9203]"
+        }
+      ],
+      "reason": "study_outcome",
+      "direct_transition": "Outcome_Management_Duration"
+    },
+    "Outcome_Management_Duration": {
+      "type": "Delay",
+      "remarks": [
+        "ED stay duration: 4-24 hours. Typical ED LOS for post-amputation",
+        "presentations (wound complication, pain, infection).",
+        "RESEARCHER_ADJUSTS: extend to 1-3 days for observation admission scenario."
+      ],
+      "range": {
+        "low": 4,
+        "high": 24,
+        "unit": "hours"
+      },
+      "direct_transition": "Outcome_Encounter_End"
+    },
+    "Outcome_Encounter_End": {
+      "type": "EncounterEnd",
+      "remarks": [
+        "Closes the ED encounter. Outcome condition (exposure_condition PAD) is",
+        "chronic and not resolved \u2014 no ConditionEnd state needed.",
+        "Patient transitions to Terminal."
+      ],
+      "direct_transition": "Terminal"
+    },
+    "Terminal": {
+      "type": "Terminal"
+    },
+    "Cov_DM_PVD_Only_Check": {
+      "type": "Simple",
+      "remarks": [
+        "DM comorbidity gate for PVD-only patients (no DM at entry).",
+        "60% of PVD-only patients have DM as a comorbidity (RESEARCHER_ADJUSTS)."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.6,
+          "transition": "Cov_DM_Onset"
+        },
+        {
+          "distribution": 0.4,
+          "transition": "Cov_CKD_Check"
+        }
+      ]
+    }
+  }
+}
