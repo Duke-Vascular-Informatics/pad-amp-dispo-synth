@@ -6,8 +6,10 @@
     "Generates the synthetic OMOP CDM consumed by pad-amp-ed-desc (Strategus).",
     "Post-amputation ED visit descriptive study.",
     "Patients: adults with dysvascular/diabetic/wound-related major lower",
-    "extremity amputation (BKA / AKA / foot). Outcome: 90-day post-discharge",
-    "ED visit. Frailty burden: VA Frailty Index (30 deficits).",
+    "extremity amputation (BKA / AKA / foot). Outcomes: 90-day post-discharge",
+    "ED visit (35%), and inpatient readmission (70% of ED visits are admitted,",
+    "plus 3% of the cohort readmitted without an ED visit; net ~27.5%).",
+    "Frailty burden: VA Frailty Index (30 deficits).",
     "=======================================================================",
     "",
     "REFERENCE \u2014 VA Frailty Index:",
@@ -1468,23 +1470,31 @@
     "Outcome_Assessment": {
       "type": "Simple",
       "remarks": [
-        "OUTCOME INCIDENCE GATE \u2014 90-day post-discharge ED visit.",
-        "Fixed marginal probability: 0.35 (35%).",
-        "Literature reference: published 90-day ED visit rates after major lower",
-        "extremity amputation approximate 25-40% (RESEARCHER_ADJUSTS per pilot data).",
-        "NOTE: This is unconditional incidence. Individual VA-FI frailty burden",
-        "does not adjust this probability in the simulation. To implement",
-        "frailty-stratified incidence, replace with a conditional_transition",
-        "tree that checks each Cov_*_Onset attribute."
+        "OUTCOME INCIDENCE GATE \u2014 90-day post-discharge outcomes (ED visit + readmission).",
+        "Three-way marginal split over the full cohort:",
+        "  0.35 (35%) \u2014 post-discharge ED visit (Outcome_Onset). Of these, 70% go on",
+        "               to an inpatient readmission (see Post_ED_Readmission_Assessment).",
+        "  0.03 (3%)  \u2014 inpatient readmission WITHOUT a preceding ED visit",
+        "               (direct to Readmission_Encounter).",
+        "  0.62 (62%) \u2014 no post-discharge outcome (Terminal).",
+        "Net readmission incidence \u2248 0.35*0.70 + 0.03 = 27.5% of the cohort;",
+        "ED visit incidence stays 35% (literature 25-40% after major LE amputation).",
+        "NOTE: unconditional incidence \u2014 VA-FI frailty burden does not adjust these",
+        "probabilities. RESEARCHER_ADJUSTS: edit the distributions below, and the",
+        "70/30 split in Post_ED_Readmission_Assessment, per pilot data."
       ],
       "distributed_transition": [
         {
-          "distribution": 0.65,
+          "distribution": 0.62,
           "transition": "Terminal"
         },
         {
           "distribution": 0.35,
           "transition": "Outcome_Onset"
+        },
+        {
+          "distribution": 0.03,
+          "transition": "Readmission_Encounter"
         }
       ]
     },
@@ -1548,7 +1558,87 @@
       "remarks": [
         "Closes the ED encounter. Outcome condition (exposure_condition PAD) is",
         "chronic and not resolved \u2014 no ConditionEnd state needed.",
-        "Patient transitions to Terminal."
+        "Patient proceeds to the post-ED readmission gate."
+      ],
+      "direct_transition": "Post_ED_Readmission_Assessment"
+    },
+    "Post_ED_Readmission_Assessment": {
+      "type": "Simple",
+      "remarks": [
+        "READMISSION GATE for patients who had a post-discharge ED visit.",
+        "70% of ED visits result in an inpatient readmission (admitted from the ED);",
+        "30% are discharged home from the ED (Terminal).",
+        "RESEARCHER_ADJUSTS: change the 0.70/0.30 split per pilot data."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.70,
+          "transition": "ED_To_Readmission_Delay"
+        },
+        {
+          "distribution": 0.30,
+          "transition": "Terminal"
+        }
+      ]
+    },
+    "ED_To_Readmission_Delay": {
+      "type": "Delay",
+      "remarks": [
+        "Short interval between the ED visit and the inpatient readmission it",
+        "triggers (admission from the ED). Keeps the readmission's visit_start_date",
+        "strictly after the ED visit and after the index discharge."
+      ],
+      "range": {
+        "low": 0,
+        "high": 2,
+        "unit": "days"
+      },
+      "direct_transition": "Readmission_Encounter"
+    },
+    "Readmission_Encounter": {
+      "type": "Encounter",
+      "remarks": [
+        "Inpatient readmission after the index amputation discharge. Convergence",
+        "point for both readmission paths: (a) admitted from a post-discharge ED",
+        "visit (70% of ED visits), and (b) direct readmission without an ED visit",
+        "(3% of the cohort, straight from Outcome_Assessment).",
+        "encounter_class 'inpatient' maps to visit_concept_id 9201 in OMOP \u2014 the",
+        "same mapping the analysis (pad-amp-ed-desc) uses to detect readmission",
+        "(earliest inpatient visit strictly after the index discharge date).",
+        "SNOMED-CT 32485007 'Hospital admission' [vocab query \u2014 OMOP 9201], reusing",
+        "the index-admission code. reason = exposure_condition (chronic PAD, assigned",
+        "on the common path before Index_Admission_Encounter) \u2014 the readmission is",
+        "identified by the inpatient VISIT, not by a distinct diagnosis, so no new",
+        "condition concept is introduced."
+      ],
+      "encounter_class": "inpatient",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "32485007",
+          "display": "Hospital admission [vocab query \u2014 OMOP 9201]"
+        }
+      ],
+      "reason": "exposure_condition",
+      "direct_transition": "Readmission_Duration"
+    },
+    "Readmission_Duration": {
+      "type": "Delay",
+      "remarks": [
+        "Readmission inpatient length of stay: 2-10 days.",
+        "RESEARCHER_ADJUSTS: adjust per observed post-amputation readmission LOS."
+      ],
+      "range": {
+        "low": 2,
+        "high": 10,
+        "unit": "days"
+      },
+      "direct_transition": "Readmission_Encounter_End"
+    },
+    "Readmission_Encounter_End": {
+      "type": "EncounterEnd",
+      "remarks": [
+        "Closes the inpatient readmission encounter. Patient transitions to Terminal."
       ],
       "direct_transition": "Terminal"
     },
