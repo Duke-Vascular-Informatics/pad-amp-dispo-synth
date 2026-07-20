@@ -2,15 +2,16 @@
 # study_params.yaml
 # OMOP Observational Study Parameters
 #
-# This is the ONLY file you need to edit for a new study.
-# All settings here flow automatically to SQL templates and analysis scripts.
+# DATA-GENERATION-ONLY repo. This drives Synthea generation + ETL + QC (Steps 1-6).
+# There is no analysis or Word report here (Steps 7-9 removed) — the real analysis
+# lives in pad-amp-ed-desc (Strategus).
 #
 # SETUP ORDER:
-#   1. Fill in every TODO item in this file
-#   2. Run: Rscript scripts/find_todos.R   — check remaining placeholders
-#   3. Run: Rscript workflow/02_define_omop_cohort_outcome_covariates.R  — validate
-#   4. Populate covariates/covariates.csv and covariates/covariate_concepts.csv
-#   5. Write your analysis in workflow/08 Sections 7–9, then run Step 8
+#   1. Author/adjust the Synthea module in synthea/modules/pad_amp_ed.json
+#   2. Run: Rscript workflow/03_generate_synthea_module_artifacts.R  — validate + diagram
+#   3. Run: Steps 4-5 (generate CSVs, ETL to omop_synth_pad_amp_ed_desc)
+#   4. Run: Rscript workflow/06_quality_check_defined_phenotypes.R  — QC counts
+#   5. Register the dataset (id: pad_amp_ed) in ../synthetic_data/registry.yaml
 #
 # CONCEPT ID LOOKUP — before writing any concept ID, run in Claude Code chat:
 #   /concept-lookup total hip replacement procedure
