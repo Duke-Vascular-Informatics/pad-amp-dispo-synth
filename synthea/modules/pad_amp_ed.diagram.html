@@ -107,13 +107,18 @@ flowchart TD
   n086["&lt;b&gt;Outcome Encounter&lt;/b&gt;&lt;br/&gt;[Encounter]&lt;br/&gt;SNOMED-CT 50849002: Emergency room admission (vocab query — OMOP 9203)"]
   n087["&lt;b&gt;Outcome Management Duration&lt;/b&gt;&lt;br/&gt;[Delay]"]
   n088["&lt;b&gt;Outcome Encounter End&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
-  n089["&lt;b&gt;Terminal&lt;/b&gt;&lt;br/&gt;[Terminal]"]
-  n090["&lt;b&gt;Cov DM PVD Only Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n089["&lt;b&gt;Post ED Readmission Assessment&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n090["&lt;b&gt;ED To Readmission Delay&lt;/b&gt;&lt;br/&gt;[Delay]"]
+  n091["&lt;b&gt;Readmission Encounter&lt;/b&gt;&lt;br/&gt;[Encounter]&lt;br/&gt;SNOMED-CT 32485007: Hospital admission (vocab query — OMOP 9201)"]
+  n092["&lt;b&gt;Readmission Duration&lt;/b&gt;&lt;br/&gt;[Delay]"]
+  n093["&lt;b&gt;Readmission Encounter End&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
+  n094["&lt;b&gt;Terminal&lt;/b&gt;&lt;br/&gt;[Terminal]"]
+  n095["&lt;b&gt;Cov DM PVD Only Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
 
   n001 --&gt; n002
   n002 --&gt; n003
   n003 --&gt; n004
-  n004 -- Age --&gt; n089
+  n004 -- Age --&gt; n094
   n004 -- else --&gt; n005
   n005 -- 30% --&gt; n006
   n005 -- 30% --&gt; n007
@@ -136,7 +141,7 @@ flowchart TD
   n017 -- 20% --&gt; n019
   n018 --&gt; n019
   n019 -- Active Condition: Type 2 diabetes mellitus --&gt; n021
-  n019 -- else --&gt; n090
+  n019 -- else --&gt; n095
   n020 --&gt; n021
   n021 -- 40% --&gt; n022
   n021 -- 60% --&gt; n025
@@ -221,7 +226,7 @@ flowchart TD
   n074 --&gt; n075
   n075 -- 5% --&gt; n076
   n075 -- 95% --&gt; n077
-  n076 --&gt; n089
+  n076 --&gt; n094
   n077 --&gt; n078
   n078 --&gt; n079
   n079 --&gt; n080
@@ -229,14 +234,21 @@ flowchart TD
   n081 --&gt; n082
   n082 --&gt; n083
   n083 --&gt; n084
-  n084 -- 65% --&gt; n089
+  n084 -- 62% --&gt; n094
   n084 -- 35% --&gt; n085
+  n084 -- 3% --&gt; n091
   n085 --&gt; n086
   n086 --&gt; n087
   n087 --&gt; n088
   n088 --&gt; n089
-  n090 -- 60% --&gt; n020
-  n090 -- 40% --&gt; n021
+  n089 -- 70% --&gt; n090
+  n089 -- 30% --&gt; n094
+  n090 --&gt; n091
+  n091 --&gt; n092
+  n092 --&gt; n093
+  n093 --&gt; n094
+  n095 -- 60% --&gt; n020
+  n095 -- 40% --&gt; n021
     </div>
   </div>
 
