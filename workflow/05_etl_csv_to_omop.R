@@ -119,7 +119,12 @@ vocab_delimiter <- "\t"
 # Fresh CDM schema used only for ETLSyntheaBuilder-driven table lifecycle.
 # Derived from cfg$study_name after config loads: omop_synth_<study_name>.
 # Set to a non-NULL string here only to override the derived value.
-target_cdm_schema_base <- NULL  # NULL = derive from cfg$study_name (recommended)
+target_cdm_schema_base <- "omop_synth_pad_amp_ed_desc"  # PINNED override (NOT the
+  # study_name-derived omop_synth_pad_amp_ed_synth). This -synth repo's study_name is
+  # pad_amp_ed_synth, but the physical CDM schema is intentionally the _desc name: it is
+  # registered in ../synthetic_data/registry.yaml (id: pad_amp_ed) and consumed by
+  # pad-amp-ed-desc AND pad-oler-aki-desc via view-overlays. Writing here REPLACES the
+  # previous dataset in place (reset_before_etl = TRUE). Matches study_params.yaml cdm_schema.
 target_cdm_schema <- NA_character_  # resolved after cfg loads below
 
 # Fallback vocabulary source schema if CSV reload is disabled.
