@@ -14,7 +14,7 @@
 # 5) Calls scripts/etl/run_synthea_full_csv_builder_etl.R to perform ETL.
 #
 # Default Step 5 strategy:
-# - Target CDM schema: omop_synth_pad_amp_ed_desc (from study_params.yaml cdm_schema)
+# - Target CDM schema: omop_synth_pad_amp_dispo (from study_params.yaml cdm_schema)
 # - Vocabulary mode   : ETLSyntheaBuilder::LoadVocabFromCsv (README-style)
 # - Vocabulary folder : supplied via env var OHDSI_VOCAB_CSV_DIR
 #
@@ -119,10 +119,10 @@ vocab_delimiter <- "\t"
 # Fresh CDM schema used only for ETLSyntheaBuilder-driven table lifecycle.
 # Derived from cfg$study_name after config loads: omop_synth_<study_name>.
 # Set to a non-NULL string here only to override the derived value.
-target_cdm_schema_base <- "omop_synth_pad_amp_ed_desc"  # PINNED override (NOT the
-  # study_name-derived omop_synth_pad_amp_ed_synth). This -synth repo's study_name is
-  # pad_amp_ed_synth, but the physical CDM schema is intentionally the _desc name: it is
-  # registered in ../synthetic_data/registry.yaml (id: pad_amp_ed) and consumed by
+target_cdm_schema_base <- "omop_synth_pad_amp_dispo"  # PINNED override (NOT the
+  # study_name-derived omop_synth_pad_amp_dispo_synth). This -synth repo's study_name is
+  # pad_amp_dispo_synth, but the physical CDM schema is intentionally the _desc name: it is
+  # registered in ../synthetic_data/registry.yaml (id: pad_amp_dispo) and consumed by
   # pad-amp-ed-desc AND pad-oler-aki-desc via view-overlays. Writing here REPLACES the
   # previous dataset in place (reset_before_etl = TRUE). Matches study_params.yaml cdm_schema.
 target_cdm_schema <- NA_character_  # resolved after cfg loads below

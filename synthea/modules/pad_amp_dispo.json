@@ -1,8 +1,8 @@
 {
-  "name": "PAD Amputation ED Visit \u2014 Synthetic Data Module",
+  "name": "PAD Amputation Disposition \u2014 Synthetic Data Module",
   "remarks": [
     "=======================================================================",
-    "SYNTHEA MODULE \u2014 pad_amp_ed (data-generation-only, repo: pad-amp-ed-synth)",
+    "SYNTHEA MODULE \u2014 pad_amp_dispo (data-generation-only, repo: pad-amp-dispo-synth)",
     "Generates the synthetic OMOP CDM consumed by pad-amp-ed-desc (Strategus).",
     "Post-amputation ED visit descriptive study.",
     "Patients: adults with dysvascular/diabetic/wound-related major lower",

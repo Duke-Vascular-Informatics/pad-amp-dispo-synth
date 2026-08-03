@@ -7,11 +7,11 @@
 # lives in pad-amp-ed-desc (Strategus).
 #
 # SETUP ORDER:
-#   1. Author/adjust the Synthea module in synthea/modules/pad_amp_ed.json
+#   1. Author/adjust the Synthea module in synthea/modules/pad_amp_dispo.json
 #   2. Run: Rscript workflow/03_generate_synthea_module_artifacts.R  — validate + diagram
-#   3. Run: Steps 4-5 (generate CSVs, ETL to omop_synth_pad_amp_ed_desc)
+#   3. Run: Steps 4-5 (generate CSVs, ETL to omop_synth_pad_amp_dispo)
 #   4. Run: Rscript workflow/06_quality_check_defined_phenotypes.R  — QC counts
-#   5. Register the dataset (id: pad_amp_ed) in ../synthetic_data/registry.yaml
+#   5. Register the dataset (id: pad_amp_dispo) in ../synthetic_data/registry.yaml
 #
 # CONCEPT ID LOOKUP — before writing any concept ID, run in Claude Code chat:
 #   /concept-lookup total hip replacement procedure
@@ -21,7 +21,7 @@
 # =============================================================================
 # STUDY IDENTITY
 # =============================================================================
-study_name:   "pad_amp_ed_synth"  # data-generation-only repo: PAD major-amputation → post-discharge ED synthetic CDM for pad-amp-ed-desc dev/test. No real analysis runs here (Steps 7-8 unused).
+study_name:   "pad_amp_dispo_synth"  # data-generation-only repo: PAD major-amputation → post-discharge ED synthetic CDM for pad-amp-ed-desc dev/test. No real analysis runs here (Steps 7-8 unused).
 study_design: "descriptive"       # inert here — Steps 7-8 never run in a -synth repo
 
 # =============================================================================
@@ -34,11 +34,14 @@ study_end_date:   "2025-12-31"
 # =============================================================================
 # DATABASE SCHEMAS FOR SYNTHETIC DATA
 # =============================================================================
-cdm_schema:     "omop_synth_pad_amp_ed_desc"   # PINNED to the _desc name (NOT _synth) on purpose:
-                                                # this physical schema is registered in
-                                                # ../synthetic_data/registry.yaml (id: pad_amp_ed) and is
-                                                # consumed by pad-amp-ed-desc AND pad-oler-aki-desc via
-                                                # view-overlays. Renaming it would break those consumers.
+cdm_schema:     "omop_synth_pad_amp_dispo"   # PINNED name (deliberately not tied to this repo's
+                                                # own _synth suffix): this physical schema is registered in
+                                                # ../synthetic_data/registry.yaml (id: pad_amp_dispo) and is
+                                                # consumed by pad-amp-ed-desc AND pad-oler-aki-desc, both via
+                                                # view-overlays (never the bare schema directly). Renamed
+                                                # 2026-07-31 from omop_synth_pad_amp_ed_desc — see CLAUDE.md
+                                                # "Schema naming" for why that rename was low-risk. Rebuild
+                                                # both consumers' overlays after any regeneration.
                                                 # Populated by Step 5 ETL; overwritten each regeneration.
 
 # results_schema, cohort_table, and output_folder default to
@@ -199,6 +202,6 @@ report:
 # DATABASE METADATA
 # Used in PatientLevelPrediction result objects and analysis reports.
 # =============================================================================
-cdm_database_id:          "pad_amp_ed_synth_cdm_v5.4"
+cdm_database_id:          "pad_amp_dispo_synth_cdm_v5.4"
 cdm_database_name:        "PAD Amputation ED Visit — Synthetic Dataset"
 cdm_database_description: "Synthetic OMOP CDM: patients undergoing major lower extremity amputation (BKA/AKA) for dysvascular, diabetic, or wound indications, with a modeled 90-day post-discharge ED-visit outcome. Data-generation-only — no real patients, no analysis run against it in this repo; consumed by pad-amp-ed-desc (Strategus) and pad-oler-aki-desc via view-overlays."

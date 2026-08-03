@@ -1,4 +1,4 @@
-# pad-amp-ed-synth — Synthetic Data Generation
+# pad-amp-dispo-synth — Synthetic Data Generation
 
 **Data-generation-only repository.** This is **not** a study. It exists solely to produce a
 synthetic OMOP CDM v5.4 dataset and register it for reuse by real study repositories. It has
@@ -13,11 +13,11 @@ for dysvascular, diabetic, or wound indications, carrying:
 - a **VA Frailty Index** comorbidity burden (~30 deficit states).
 
 The dataset is authored as a single Synthea disease module
-(`synthea/modules/pad_amp_ed.json`) and materialized into SQL Server via ETL.
+(`synthea/modules/pad_amp_dispo.json`) and materialized into SQL Server via ETL.
 
 ## Who consumes it
 
-The resulting CDM schema (`omop_synth_pad_amp_ed_desc`) is consumed by:
+The resulting CDM schema (`omop_synth_pad_amp_dispo`) is consumed by:
 
 - **`pad-amp-ed-desc`** — the Strategus analysis study (the real analysis + Word manuscript).
 - **`pad-oler-aki-desc`** — via a read-only view-overlay.
@@ -26,7 +26,7 @@ Consumers point their `OMOP_CDM_SCHEMA_OVERRIDE` at a view-overlay built with
 `synthetic_data/scripts/generate_overlay_schema.R`. The schema name intentionally keeps the
 `_desc` suffix (not `_synth`) so those overlays don't break — see [CLAUDE.md](CLAUDE.md).
 
-The dataset is registered in `../synthetic_data/registry.yaml` as `id: pad_amp_ed`.
+The dataset is registered in `../synthetic_data/registry.yaml` as `id: pad_amp_dispo`.
 
 ## Scope: Steps 1-6 only
 
@@ -40,7 +40,7 @@ This repo runs the Synthea/ETL/QC half of the pipeline and nothing else. There i
 | 2 | `workflow/02_define_omop_cohort_outcome_covariates.R` | Validate cohort SQL / concept IDs used for QC checks |
 | 3 | `workflow/03_generate_synthea_module_artifacts.R` | Validate the Synthea module and regenerate its HTML diagram |
 | 4 | `workflow/04_generate_synthea_csv.sh` / `.ps1` | Generate Synthea synthetic patient CSVs |
-| 5 | `workflow/05_etl_csv_to_omop.R` | ETL Synthea CSV → OMOP CDM (`omop_synth_pad_amp_ed_desc`) |
+| 5 | `workflow/05_etl_csv_to_omop.R` | ETL Synthea CSV → OMOP CDM (`omop_synth_pad_amp_dispo`) |
 | 6 | `workflow/06_quality_check_defined_phenotypes.R` | Post-ETL data-quality + phenotype sanity checks |
 
 After a successful Step 5/6 run, update the dataset's `generation_params` and
@@ -49,7 +49,7 @@ After a successful Step 5/6 run, update the dataset's `generation_params` and
 ## Repository structure
 
 ```
-pad-amp-ed-synth/
+pad-amp-dispo-synth/
   study_params.yaml           ← generation config (all analyses: false)
   config.R                    ← infrastructure settings (no edits needed)
   workflow/01–06 + bootstrap  ← Synthea generation → ETL → QC
@@ -57,7 +57,7 @@ pad-amp-ed-synth/
   scripts/                    ← ETL, Synthea runner, QC utilities
   cohorts/                    ← SQL cohort definitions (kept for Step 6 QC checks)
   covariates/                 ← header-only (authoritative defs live in pad-amp-ed-desc)
-  synthea/modules/            ← pad_amp_ed.json disease module + diagram
+  synthea/modules/            ← pad_amp_dispo.json disease module + diagram
   external/synthea/           ← vendored Synthea engine (submodule; git submodule update --init)
   drivers/                    ← JDBC driver archive
 ```

@@ -119,7 +119,7 @@ follow [../docs/GETTING_STARTED.md](../docs/GETTING_STARTED.md).
 
 This is a **data-generation-only** repo. There is no analysis, Word report, or portable-bundle
 step here (`workflow/07-09` have been removed). Once Steps 1-6 produce and QC the synthetic CDM,
-register/update this dataset (`id: pad_amp_ed`) in `../synthetic_data/registry.yaml` — that is the
+register/update this dataset (`id: pad_amp_dispo`) in `../synthetic_data/registry.yaml` — that is the
 final deliverable. The real analysis (Strategus + Word manuscript) lives in `pad-amp-ed-desc`.
 
 ---
