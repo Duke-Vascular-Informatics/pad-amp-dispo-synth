@@ -34,4 +34,4 @@ references:
     title: "OMOP Study Template"
     authors:
       - name: "OMOP Study Template Contributors"
-    url: "https://github.com/adam-mdmph/synthea-omop-template"
+    url: "https://github.com/Duke-Vascular-Informatics/synthea-omop-template"
