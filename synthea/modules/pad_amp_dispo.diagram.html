@@ -93,32 +93,68 @@ flowchart TD
   n072["&lt;b&gt;Cov FTT Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 54840006: Failure to thrive (vocab query — OMOP 437986)"]
   n073["&lt;b&gt;Cov Fatigue Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
   n074["&lt;b&gt;Cov Fatigue Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 84229001: Fatigue (vocab query — OMOP 4079541)"]
-  n075["&lt;b&gt;Treatment Strategy&lt;/b&gt;&lt;br/&gt;[Simple]"]
-  n076["&lt;b&gt;Non Exposed Path End&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
-  n077["&lt;b&gt;Target Exposed Path End&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
-  n078["&lt;b&gt;Pre Index Workup Delay&lt;/b&gt;&lt;br/&gt;[Delay]"]
-  n079["&lt;b&gt;Index Admission Encounter&lt;/b&gt;&lt;br/&gt;[Encounter]&lt;br/&gt;SNOMED-CT 32485007: Hospital admission (vocab query — OMOP 9201)"]
-  n080["&lt;b&gt;Index Procedure&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 88312006: Amputation of leg through tibia and fibula (vocab query — OMOP 4338257)"]
-  n081["&lt;b&gt;Post Index Inpatient Delay&lt;/b&gt;&lt;br/&gt;[Delay]"]
-  n082["&lt;b&gt;Index Encounter End&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
-  n083["&lt;b&gt;Post Discharge Observation Delay&lt;/b&gt;&lt;br/&gt;[Delay]"]
-  n084["&lt;b&gt;Outcome Assessment&lt;/b&gt;&lt;br/&gt;[Simple]"]
-  n085["&lt;b&gt;Outcome Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 50849002: Emergency room admission (vocab query — OMOP 9203)"]
-  n086["&lt;b&gt;Outcome Encounter&lt;/b&gt;&lt;br/&gt;[Encounter]&lt;br/&gt;SNOMED-CT 50849002: Emergency room admission (vocab query — OMOP 9203)"]
-  n087["&lt;b&gt;Outcome Management Duration&lt;/b&gt;&lt;br/&gt;[Delay]"]
-  n088["&lt;b&gt;Outcome Encounter End&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
-  n089["&lt;b&gt;Post ED Readmission Assessment&lt;/b&gt;&lt;br/&gt;[Simple]"]
-  n090["&lt;b&gt;ED To Readmission Delay&lt;/b&gt;&lt;br/&gt;[Delay]"]
-  n091["&lt;b&gt;Readmission Encounter&lt;/b&gt;&lt;br/&gt;[Encounter]&lt;br/&gt;SNOMED-CT 32485007: Hospital admission (vocab query — OMOP 9201)"]
-  n092["&lt;b&gt;Readmission Duration&lt;/b&gt;&lt;br/&gt;[Delay]"]
-  n093["&lt;b&gt;Readmission Encounter End&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
-  n094["&lt;b&gt;Terminal&lt;/b&gt;&lt;br/&gt;[Terminal]"]
-  n095["&lt;b&gt;Cov DM PVD Only Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n075["&lt;b&gt;Cov TissueLoss Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n076["&lt;b&gt;Cov TissueLoss Type&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n077["&lt;b&gt;Cov TissueLoss Ulcer&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 13954005: Ischemic ulcer (vocab query — OMOP 4029926)"]
+  n078["&lt;b&gt;Cov TissueLoss Gangrene&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 402861007: Ischemic gangrene (vocab query — OMOP 4291464)"]
+  n079["&lt;b&gt;Cov PAOD Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n080["&lt;b&gt;Cov PAOD Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 399957001: Peripheral arterial occlusive disease (vocab query — OMOP 317309)"]
+  n081["&lt;b&gt;Cov FuncStatus Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n082["&lt;b&gt;Cov ImpairedMobility Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 82971005: Impaired mobility (vocab query — OMOP 4306934)"]
+  n083["&lt;b&gt;Cov Frailty Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 248279007: Frailty (vocab query — OMOP 4086506)"]
+  n084["&lt;b&gt;Cov AmbuAid Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n085["&lt;b&gt;Cov WalkingAid Onset&lt;/b&gt;&lt;br/&gt;[Observation]&lt;br/&gt;SNOMED-CT 165251008: Walking aid use (vocab query — OMOP 4012645)"]
+  n086["&lt;b&gt;Cov Wheelchair Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n087["&lt;b&gt;Cov Wheelchair Device&lt;/b&gt;&lt;br/&gt;[Device]"]
+  n088["&lt;b&gt;Cov Insulin Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n089["&lt;b&gt;Cov Insulin Order&lt;/b&gt;&lt;br/&gt;[MedicationOrder]&lt;br/&gt;RxNorm 274783: insulin glargine (vocab query — OMOP 1502905)"]
+  n090["&lt;b&gt;Treatment Strategy&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n091["&lt;b&gt;Non Exposed Path End&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
+  n092["&lt;b&gt;Target Exposed Path End&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
+  n093["&lt;b&gt;Pre Index Workup Delay&lt;/b&gt;&lt;br/&gt;[Delay]"]
+  n094["&lt;b&gt;Preop Clearance Encounter&lt;/b&gt;&lt;br/&gt;[Encounter]&lt;br/&gt;SNOMED-CT 185349003: Encounter for check up (vocab query — OMOP 4085799)"]
+  n095["&lt;b&gt;Cov CHF Recent Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n096["&lt;b&gt;Cov CHF Recent Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 84114007: Heart failure (vocab query — OMOP 316139)"]
+  n097["&lt;b&gt;Cov Hgb Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n098["&lt;b&gt;Cov Hgb Low&lt;/b&gt;&lt;br/&gt;[Observation]&lt;br/&gt;LOINC 718-7: Hemoglobin (Mass/volume) in Blood (vocab query — OMOP 3000963)"]
+  n099["&lt;b&gt;Cov Hgb Normal&lt;/b&gt;&lt;br/&gt;[Observation]&lt;br/&gt;LOINC 718-7: Hemoglobin (Mass/volume) in Blood (vocab query — OMOP 3000963)"]
+  n100["&lt;b&gt;Cov Creatinine Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n101["&lt;b&gt;Cov Creatinine High&lt;/b&gt;&lt;br/&gt;[Observation]&lt;br/&gt;LOINC 2160-0: Creatinine (Mass/volume) in Serum or Plasma (vocab query — OMOP 3016723)"]
+  n102["&lt;b&gt;Cov Creatinine Normal&lt;/b&gt;&lt;br/&gt;[Observation]&lt;br/&gt;LOINC 2160-0: Creatinine (Mass/volume) in Serum or Plasma (vocab query — OMOP 3016723)"]
+  n103["&lt;b&gt;Cov Underweight Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n104["&lt;b&gt;Cov BMI Underweight&lt;/b&gt;&lt;br/&gt;[Observation]&lt;br/&gt;LOINC 39156-5: Body mass index (BMI) (Ratio) (vocab query — OMOP 3038553)"]
+  n105["&lt;b&gt;Cov Weight Low&lt;/b&gt;&lt;br/&gt;[Observation]&lt;br/&gt;LOINC 29463-7: Body weight (vocab query — OMOP 3025315)"]
+  n106["&lt;b&gt;Cov BMI Normal&lt;/b&gt;&lt;br/&gt;[Observation]&lt;br/&gt;LOINC 39156-5: Body mass index (BMI) (Ratio) (vocab query — OMOP 3038553)"]
+  n107["&lt;b&gt;Cov Height Preop&lt;/b&gt;&lt;br/&gt;[Observation]&lt;br/&gt;LOINC 8302-2: Body height (vocab query — OMOP 3036277)"]
+  n108["&lt;b&gt;Preop Clearance Encounter End&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
+  n109["&lt;b&gt;Preop To Index Delay&lt;/b&gt;&lt;br/&gt;[Delay]"]
+  n110["&lt;b&gt;Index Admission Encounter&lt;/b&gt;&lt;br/&gt;[Encounter]&lt;br/&gt;SNOMED-CT 32485007: Hospital admission (vocab query — OMOP 9201)"]
+  n111["&lt;b&gt;Index Procedure Branch&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n112["&lt;b&gt;Index Procedure AKA&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 79733001: Amputation above-knee (vocab query — OMOP 4195136)"]
+  n113["&lt;b&gt;Index Procedure&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 88312006: Amputation of leg through tibia and fibula (vocab query — OMOP 4338257)"]
+  n114["&lt;b&gt;Post Index Inpatient Delay&lt;/b&gt;&lt;br/&gt;[Delay]"]
+  n115["&lt;b&gt;Discharge Disposition Branch&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n116["&lt;b&gt;Index Discharge Home&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
+  n117["&lt;b&gt;Index Discharge SNF&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
+  n118["&lt;b&gt;Index Discharge IRF&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
+  n119["&lt;b&gt;Post Discharge Observation Delay&lt;/b&gt;&lt;br/&gt;[Delay]"]
+  n120["&lt;b&gt;Outcome Assessment&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n121["&lt;b&gt;Outcome Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 50849002: Emergency room admission (vocab query — OMOP 9203)"]
+  n122["&lt;b&gt;Outcome Encounter&lt;/b&gt;&lt;br/&gt;[Encounter]&lt;br/&gt;SNOMED-CT 50849002: Emergency room admission (vocab query — OMOP 9203)"]
+  n123["&lt;b&gt;Outcome Management Duration&lt;/b&gt;&lt;br/&gt;[Delay]"]
+  n124["&lt;b&gt;Outcome Encounter End&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
+  n125["&lt;b&gt;Post ED Readmission Assessment&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n126["&lt;b&gt;ED To Readmission Delay&lt;/b&gt;&lt;br/&gt;[Delay]"]
+  n127["&lt;b&gt;Readmission Encounter&lt;/b&gt;&lt;br/&gt;[Encounter]&lt;br/&gt;SNOMED-CT 32485007: Hospital admission (vocab query — OMOP 9201)"]
+  n128["&lt;b&gt;Readmission Duration&lt;/b&gt;&lt;br/&gt;[Delay]"]
+  n129["&lt;b&gt;Readmission Encounter End&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
+  n130["&lt;b&gt;Terminal&lt;/b&gt;&lt;br/&gt;[Terminal]"]
+  n131["&lt;b&gt;Cov DM PVD Only Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
 
   n001 --&gt; n002
   n002 --&gt; n003
   n003 --&gt; n004
-  n004 -- Age --&gt; n094
+  n004 -- Age --&gt; n130
   n004 -- else --&gt; n005
   n005 -- 30% --&gt; n006
   n005 -- 30% --&gt; n007
@@ -141,7 +177,7 @@ flowchart TD
   n017 -- 20% --&gt; n019
   n018 --&gt; n019
   n019 -- Active Condition: Type 2 diabetes mellitus --&gt; n021
-  n019 -- else --&gt; n095
+  n019 -- else --&gt; n131
   n020 --&gt; n021
   n021 -- 40% --&gt; n022
   n021 -- 60% --&gt; n025
@@ -224,31 +260,81 @@ flowchart TD
   n073 -- 30% --&gt; n074
   n073 -- 70% --&gt; n075
   n074 --&gt; n075
-  n075 -- 5% --&gt; n076
-  n075 -- 95% --&gt; n077
-  n076 --&gt; n094
-  n077 --&gt; n078
+  n075 -- 55% --&gt; n076
+  n075 -- 45% --&gt; n079
+  n076 -- 70% --&gt; n077
+  n076 -- 30% --&gt; n078
+  n077 --&gt; n079
   n078 --&gt; n079
-  n079 --&gt; n080
+  n079 -- 85% --&gt; n080
+  n079 -- 15% --&gt; n081
   n080 --&gt; n081
-  n081 --&gt; n082
+  n081 -- 25% --&gt; n082
+  n081 -- 75% --&gt; n084
   n082 --&gt; n083
   n083 --&gt; n084
-  n084 -- 62% --&gt; n094
-  n084 -- 35% --&gt; n085
-  n084 -- 3% --&gt; n091
+  n084 -- 20% --&gt; n085
+  n084 -- 80% --&gt; n086
   n085 --&gt; n086
-  n086 --&gt; n087
+  n086 -- 10% --&gt; n087
+  n086 -- 90% --&gt; n088
   n087 --&gt; n088
-  n088 --&gt; n089
-  n089 -- 70% --&gt; n090
-  n089 -- 30% --&gt; n094
-  n090 --&gt; n091
-  n091 --&gt; n092
+  n088 -- 30% --&gt; n089
+  n088 -- 70% --&gt; n090
+  n089 --&gt; n090
+  n090 -- 5% --&gt; n091
+  n090 -- 95% --&gt; n092
+  n091 --&gt; n130
   n092 --&gt; n093
   n093 --&gt; n094
-  n095 -- 60% --&gt; n020
-  n095 -- 40% --&gt; n021
+  n094 --&gt; n095
+  n095 -- 35% --&gt; n096
+  n095 -- 65% --&gt; n097
+  n096 --&gt; n097
+  n097 -- 30% --&gt; n098
+  n097 -- 70% --&gt; n099
+  n098 --&gt; n100
+  n099 --&gt; n100
+  n100 -- 18% --&gt; n101
+  n100 -- 82% --&gt; n102
+  n101 --&gt; n103
+  n102 --&gt; n103
+  n103 -- 10% --&gt; n104
+  n103 -- 90% --&gt; n106
+  n104 --&gt; n105
+  n105 --&gt; n107
+  n106 --&gt; n107
+  n107 --&gt; n108
+  n108 --&gt; n109
+  n109 --&gt; n110
+  n110 --&gt; n111
+  n111 -- 40% --&gt; n112
+  n111 -- 60% --&gt; n113
+  n112 --&gt; n114
+  n113 --&gt; n114
+  n114 --&gt; n115
+  n115 -- 65% --&gt; n116
+  n115 -- 22% --&gt; n117
+  n115 -- 13% --&gt; n118
+  n116 --&gt; n119
+  n117 --&gt; n119
+  n118 --&gt; n119
+  n119 --&gt; n120
+  n120 -- 62% --&gt; n130
+  n120 -- 35% --&gt; n121
+  n120 -- 3% --&gt; n127
+  n121 --&gt; n122
+  n122 --&gt; n123
+  n123 --&gt; n124
+  n124 --&gt; n125
+  n125 -- 70% --&gt; n126
+  n125 -- 30% --&gt; n130
+  n126 --&gt; n127
+  n127 --&gt; n128
+  n128 --&gt; n129
+  n129 --&gt; n130
+  n131 -- 60% --&gt; n020
+  n131 -- 40% --&gt; n021
     </div>
   </div>
 
