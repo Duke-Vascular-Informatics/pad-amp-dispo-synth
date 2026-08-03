@@ -18,7 +18,7 @@ Focused deep dives are split into dedicated docs:
 **Requires:** ~35 GB disk space, 8 GB RAM (16 GB recommended), active internet
 
 > **Using `omop-dev-workspace`?**  
-> The [omop-dev-workspace](https://github.com/adam-mdmph/omop-dev-workspace) provides SQL Server,
+> The [omop-dev-workspace](https://github.com/Duke-Vascular-Informatics/omop-dev-workspace) provides SQL Server,
 > the OMOP vocabulary mount, and the dev container as shared infrastructure. If you are working
 > inside that workspace, **skip Steps 4, 6, and 7** (machine setup is already done).
 > Clone your study repo into the workspace folder, then jump to **Step 5** to create the repo
@@ -884,4 +884,3 @@ Use focused troubleshooting docs to reduce duplicated guidance and merge conflic
 - **SQL Server:** Azure SQL Edge (ARM64) or SQL Server 2022 (AMD64)
 - **OHDSI packages:** Latest from [github.com/OHDSI](https://github.com/OHDSI)
 - **OMOP CDM:** v5.4
-

@@ -60,7 +60,7 @@ remote, created from the `synthea-omop-template` lineage (bootstrapped from
 
 | Remote | URL | What to push |
 |--------|-----|--------------|
-| `origin` | `https://github.com/adam-mdmph/pad-amp-dispo-synth.git` | Full repository |
+| `origin` | `https://github.com/Duke-Vascular-Informatics/pad-amp-dispo-synth.git` | Full repository |
 
 ```bash
 BRANCH=$(gh api user --jq .login)
