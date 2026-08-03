@@ -24,7 +24,7 @@ Run **Steps 1-6 only** (module authoring, Synthea generation, ETL, QC). Steps 7-
 
 ### The Synthea module
 
-- The single authored module is `synthea/modules/pad_amp_ed.json` (PAD → major
+- The single authored module is `synthea/modules/pad_amp_dispo.json` (PAD → major
   amputation → 90-day post-discharge ED-visit pathway, ~30 VA-FI comorbidity states,
   and a fixed ED-visit probability gate). `study_template.json` is the generic stub and
   is auto-skipped by Steps 3/4.
@@ -35,15 +35,19 @@ Run **Steps 1-6 only** (module authoring, Synthea generation, ETL, QC). Steps 7-
 
 ### Schema naming (important)
 
-`cdm_schema` is pinned to **`omop_synth_pad_amp_ed_desc`** (NOT `..._synth`) even though
-this repo is `pad-amp-ed-synth`. That physical schema is registered in
-`../synthetic_data/registry.yaml` (`id: pad_amp_ed`) and is consumed by both
-`pad-amp-ed-desc` and `pad-oler-aki-desc` via view-overlays. Renaming it would break
-those consumers. Do not change it.
+`cdm_schema` is pinned to **`omop_synth_pad_amp_dispo`** (NOT `..._synth`) even though
+this repo is `pad-amp-dispo-synth`. That physical schema is registered in
+`../synthetic_data/registry.yaml` (`id: pad_amp_dispo`) and is consumed by both
+`pad-amp-ed-desc` and `pad-oler-aki-desc` via view-overlays — both consume it through
+an overlay schema, never the bare name directly, which is what made the 2026-07-31
+rename (`pad-amp-ed-synth`/`pad_amp_ed`/`omop_synth_pad_amp_ed_desc` → `pad-amp-dispo-synth`/
+`pad_amp_dispo`/`omop_synth_pad_amp_dispo`) low-risk: rebuild each consumer's overlay
+after any regeneration, but do not change the pinned name again without checking both
+consumers' overlay targets first.
 
 ### After a Step 5/6 run
 
-Register/update the dataset entry in `../synthetic_data/registry.yaml` (`id: pad_amp_ed`)
+Register/update the dataset entry in `../synthetic_data/registry.yaml` (`id: pad_amp_dispo`)
 per that file's README — fill in `generation_params` and `last_generated.qc_summary`.
 A consumer points its `OMOP_CDM_SCHEMA_OVERRIDE` view-overlay at this schema via
 `Rscript synthetic_data/scripts/generate_overlay_schema.R`.
@@ -56,7 +60,7 @@ remote, created from the `synthea-omop-template` lineage (bootstrapped from
 
 | Remote | URL | What to push |
 |--------|-----|--------------|
-| `origin` | `https://github.com/adam-mdmph/pad-amp-ed-synth.git` | Full repository |
+| `origin` | `https://github.com/adam-mdmph/pad-amp-dispo-synth.git` | Full repository |
 
 ```bash
 BRANCH=$(gh api user --jq .login)

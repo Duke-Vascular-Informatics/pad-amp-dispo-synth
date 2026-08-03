@@ -1,8 +1,8 @@
 {
-  "name": "PAD Amputation ED Visit \u2014 Synthetic Data Module",
+  "name": "PAD Amputation Disposition \u2014 Synthetic Data Module",
   "remarks": [
     "=======================================================================",
-    "SYNTHEA MODULE \u2014 pad_amp_ed (data-generation-only, repo: pad-amp-ed-synth)",
+    "SYNTHEA MODULE \u2014 pad_amp_dispo (data-generation-only, repo: pad-amp-dispo-synth)",
     "Generates the synthetic OMOP CDM consumed by pad-amp-ed-desc (Strategus).",
     "Post-amputation ED visit descriptive study.",
     "Patients: adults with dysvascular/diabetic/wound-related major lower",
@@ -61,7 +61,16 @@
     "",
     "OUTCOME INCIDENCE:",
     "  0.35 (35%) is consistent with published 90-day ED visit rates after",
-    "  major lower extremity amputation (RESEARCHER_ADJUSTS per pilot data)."
+    "  major lower extremity amputation (RESEARCHER_ADJUSTS per pilot data).",
+    "",
+    "2026-08-02 EXTENSION - non-home discharge outcome + three-score covariates.",
+    "Added: index discharge disposition (NUBC 01/03/62) driving the NHD outcome;",
+    "an AKA index arm alongside BKA; risk-score covariates for the Iannuzzi 2020,",
+    "Subramaniam mFI-5 and Kraiss sVQI-FS scores (tissue loss, PAOD, dependent",
+    "functional status, walking aid, wheelchair device, insulin); and a",
+    "preoperative clearance encounter carrying Hgb, creatinine, BMI/weight/height",
+    "and a recent CHF record. See per-state remarks for the measured baseline each",
+    "one addresses. All concept codes verified against omop_vocab 2026-08-02."
   ],
   "states": {
     "Initial": {
@@ -1316,7 +1325,7 @@
         },
         {
           "distribution": 0.7,
-          "transition": "Treatment_Strategy"
+          "transition": "Cov_TissueLoss_Check"
         }
       ]
     },
@@ -1334,6 +1343,301 @@
           "display": "Fatigue [vocab query \u2014 OMOP 4079541]"
         }
       ],
+      "direct_transition": "Cov_TissueLoss_Check"
+    },
+    "Cov_TissueLoss_Check": {
+      "type": "Simple",
+      "remarks": [
+        "RISK-SCORE COVARIATE: tissue_loss (Iannuzzi 2020, 3 points).",
+        "Measured 0 of 379 index patients before this block existed - the module",
+        "had no ischemic ulcer or gangrene state at all, so the component could",
+        "never activate.",
+        "Prevalence 55%: tissue loss (rest pain / ulcer / gangrene) is the dominant",
+        "indication for major amputation in a dysvascular cohort. (RESEARCHER_ADJUSTS)"
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.55,
+          "transition": "Cov_TissueLoss_Type"
+        },
+        {
+          "distribution": 0.45,
+          "transition": "Cov_PAOD_Check"
+        }
+      ]
+    },
+    "Cov_TissueLoss_Type": {
+      "type": "Simple",
+      "remarks": [
+        "Split tissue loss into ulcer vs frank gangrene. Both concepts sit in the",
+        "Iannuzzi tissue_loss concept set, so the split only adds realism to the",
+        "generated conditions - either branch activates the covariate."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.7,
+          "transition": "Cov_TissueLoss_Ulcer"
+        },
+        {
+          "distribution": 0.3,
+          "transition": "Cov_TissueLoss_Gangrene"
+        }
+      ]
+    },
+    "Cov_TissueLoss_Ulcer": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 13954005 'Ischemic ulcer' -> OMOP 4029926 (Condition) [vocab query \u2014 2026-08-02].",
+        "covariate_concepts.csv :: tissue_loss, include_descendants = TRUE."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "13954005",
+          "display": "Ischemic ulcer [vocab query \u2014 OMOP 4029926]"
+        }
+      ],
+      "direct_transition": "Cov_PAOD_Check"
+    },
+    "Cov_TissueLoss_Gangrene": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 402861007 'Ischemic gangrene' -> OMOP 4291464 (Condition) [vocab query \u2014 2026-08-02].",
+        "covariate_concepts.csv :: tissue_loss, include_descendants = TRUE."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "402861007",
+          "display": "Ischemic gangrene [vocab query \u2014 OMOP 4291464]"
+        }
+      ],
+      "direct_transition": "Cov_PAOD_Check"
+    },
+    "Cov_PAOD_Check": {
+      "type": "Simple",
+      "remarks": [
+        "RISK-SCORE COVARIATE: pvd (Kraiss sVQI-FS, 1 point).",
+        "",
+        "WHY THIS STATE EXISTS - the module already had a PVD state",
+        "(Exposure_PVD_Only / Exposure_PVD_DM_PAD, SNOMED 400047006), but that code",
+        "maps to OMOP 321052, which is an ANCESTOR of 317309 two levels up, not a",
+        "descendant. covariate_concepts_vqifs.csv rolls pvd up from 317309, so the",
+        "existing states contributed NOTHING and pvd measured 0 of 379.",
+        "Confirmed against concept_ancestor [vocab query \u2014 2026-08-02].",
+        "",
+        "Prevalence 85%: PAD is a target-cohort eligibility indication, so a",
+        "diagnosis-based PVD item activates near-universally by construction."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.85,
+          "transition": "Cov_PAOD_Onset"
+        },
+        {
+          "distribution": 0.15,
+          "transition": "Cov_FuncStatus_Check"
+        }
+      ]
+    },
+    "Cov_PAOD_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 399957001 'Peripheral arterial occlusive disease' -> OMOP 317309 [vocab query \u2014 2026-08-02].",
+        "This is the exact rollup ancestor covariate_concepts_vqifs.csv uses for pvd."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "399957001",
+          "display": "Peripheral arterial occlusive disease [vocab query \u2014 OMOP 317309]"
+        }
+      ],
+      "direct_transition": "Cov_FuncStatus_Check"
+    },
+    "Cov_FuncStatus_Check": {
+      "type": "Simple",
+      "remarks": [
+        "RISK-SCORE COVARIATE: fs_dep, dependent functional status (mFI-5, 1 point).",
+        "Measured 0 of 379 before this block existed.",
+        "Prevalence 25%. (RESEARCHER_ADJUSTS)",
+        "",
+        "BOTH concepts are emitted for every positive patient, deliberately. The two",
+        "halves of the mFI-5 fs_dep concept set land in DIFFERENT OMOP domains -",
+        "4306934 Impaired mobility is Observation, 4086506 Frailty is Condition - but",
+        "covariates_mfi5.csv declares a single domain ('observation') for the",
+        "component. Emitting only one concept would leave the covariate unreachable",
+        "whenever the analysis queries the other domain. Same class of bug that made",
+        "ambu_deficit activate 0 of 225 until it was switched to domain = 'auto'."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.25,
+          "transition": "Cov_ImpairedMobility_Onset"
+        },
+        {
+          "distribution": 0.75,
+          "transition": "Cov_AmbuAid_Check"
+        }
+      ]
+    },
+    "Cov_ImpairedMobility_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 82971005 'Impaired mobility' -> OMOP 4306934 (Observation) [vocab query \u2014 2026-08-02].",
+        "covariate_concepts_mfi5.csv :: fs_dep.",
+        "Falls through to the Frailty state - both are emitted, see the gate remarks."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "82971005",
+          "display": "Impaired mobility [vocab query \u2014 OMOP 4306934]"
+        }
+      ],
+      "direct_transition": "Cov_Frailty_Onset"
+    },
+    "Cov_Frailty_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 248279007 'Frailty' -> OMOP 4086506 (Condition) [vocab query \u2014 2026-08-02].",
+        "covariate_concepts_mfi5.csv :: fs_dep. Condition domain, unlike its",
+        "Observation-domain partner above."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "248279007",
+          "display": "Frailty [vocab query \u2014 OMOP 4086506]"
+        }
+      ],
+      "direct_transition": "Cov_AmbuAid_Check"
+    },
+    "Cov_AmbuAid_Check": {
+      "type": "Simple",
+      "remarks": [
+        "RISK-SCORE COVARIATE: ambu_deficit (Iannuzzi, 3 points) and nonambulatory",
+        "(Kraiss sVQI-FS, 1 point) - the same 7-concept set under two score-specific",
+        "names.",
+        "Already measured 107 of 379 via the existing Cov_Gait_Onset (437643), so",
+        "this only strengthens an existing signal and exercises the Observation",
+        "branch of the domain = 'auto' union explicitly.",
+        "Prevalence 20%. (RESEARCHER_ADJUSTS)"
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.2,
+          "transition": "Cov_WalkingAid_Onset"
+        },
+        {
+          "distribution": 0.8,
+          "transition": "Cov_Wheelchair_Check"
+        }
+      ]
+    },
+    "Cov_WalkingAid_Onset": {
+      "type": "Observation",
+      "remarks": [
+        "SNOMED-CT 165251008 'Walking aid use' -> OMOP 4012645 (Observation) [vocab query \u2014 2026-08-02].",
+        "covariate_concepts.csv :: ambu_deficit, include_descendants = TRUE.",
+        "Emitted as an Observation state (not ConditionOnset) so it lands in the",
+        "observation table, matching the concept's OMOP domain."
+      ],
+      "category": "survey",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "165251008",
+          "display": "Walking aid use [vocab query \u2014 OMOP 4012645]"
+        }
+      ],
+      "direct_transition": "Cov_Wheelchair_Check"
+    },
+    "Cov_Wheelchair_Check": {
+      "type": "Simple",
+      "remarks": [
+        "RISK-SCORE COVARIATE: ambu_deficit / nonambulatory, Device-domain arm.",
+        "",
+        "This is the ONLY state in the module that writes to device_exposure, and it",
+        "exists specifically to exercise that branch of",
+        "query_auto_domain_covariate_counts(). Concept 4240470 Wheelchair sits in the",
+        "Device domain; a single-domain query misses it entirely, which is precisely",
+        "why ambu_deficit once activated 0 of 225 patients.",
+        "Prevalence 10% - a subset of the non-ambulatory group. (RESEARCHER_ADJUSTS)"
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.1,
+          "transition": "Cov_Wheelchair_Device"
+        },
+        {
+          "distribution": 0.9,
+          "transition": "Cov_Insulin_Check"
+        }
+      ]
+    },
+    "Cov_Wheelchair_Device": {
+      "type": "Device",
+      "remarks": [
+        "SNOMED-CT 58938008 'Wheelchair' -> OMOP 4240470 (Device domain) [vocab query \u2014 2026-08-02].",
+        "covariate_concepts.csv :: ambu_deficit, include_descendants = FALSE - so",
+        "the EXACT ancestor code must be emitted. Descendants such as 4045112",
+        "Manual wheelchair already exist in this CDM from stock Synthea but do not",
+        "count under that flag."
+      ],
+      "code": {
+        "system": "SNOMED-CT",
+        "code": "58938008",
+        "display": "Wheelchair [vocab query \u2014 OMOP 4240470]"
+      },
+      "direct_transition": "Cov_Insulin_Check"
+    },
+    "Cov_Insulin_Check": {
+      "type": "Simple",
+      "remarks": [
+        "RISK-SCORE COVARIATE: insulin_dep, insulin-dependent diabetes",
+        "(Iannuzzi, 2 points).",
+        "Already measured 67 of 379 from stock Synthea's diabetes modules; this",
+        "raises it to a level appropriate for a dysvascular amputation cohort.",
+        "Prevalence 30% of the whole cohort. (RESEARCHER_ADJUSTS)"
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.3,
+          "transition": "Cov_Insulin_Order"
+        },
+        {
+          "distribution": 0.7,
+          "transition": "Treatment_Strategy"
+        }
+      ]
+    },
+    "Cov_Insulin_Order": {
+      "type": "MedicationOrder",
+      "remarks": [
+        "RxNorm 274783 'insulin glargine' -> OMOP 1502905 (Drug) [vocab query \u2014 2026-08-02].",
+        "Verified descendant of ATC 21600713 'INSULINS AND ANALOGUES' [vocab query \u2014 2026-08-02], which",
+        "is the rollup ancestor covariate_concepts.csv uses for insulin_dep."
+      ],
+      "codes": [
+        {
+          "system": "RxNorm",
+          "code": "274783",
+          "display": "insulin glargine [vocab query \u2014 OMOP 1502905]"
+        }
+      ],
+      "dosage": {
+        "amount": 1,
+        "frequency": 1,
+        "period": 1,
+        "unit": "days"
+      },
+      "duration": {
+        "low": 60,
+        "high": 180,
+        "unit": "days"
+      },
+      "reason": "exposure_condition",
       "direct_transition": "Treatment_Strategy"
     },
     "Treatment_Strategy": {
@@ -1373,11 +1677,375 @@
         "Time from outpatient evaluation to amputation.",
         "Range: 7-90 days \u2014 reflects urgent/semi-elective limb-threatening ischemia.",
         "Truly emergent cases (acute limb ischemia) would be 0-2 days.",
-        "RESEARCHER_ADJUSTS: narrow to 0-7 for emergency presentation cohort."
+        "RESEARCHER_ADJUSTS: narrow to 0-7 for emergency presentation cohort.",
+        "Narrowed 7-90 -> 7-60 days on 2026-08-02 so that adding the 1-30 day",
+        "Preop_To_Index_Delay downstream keeps the total pre-index interval in the",
+        "same 8-90 day band this state originally documented."
       ],
       "range": {
         "low": 7,
-        "high": 90,
+        "high": 60,
+        "unit": "days"
+      },
+      "direct_transition": "Preop_Clearance_Encounter"
+    },
+    "Preop_Clearance_Encounter": {
+      "type": "Encounter",
+      "remarks": [
+        "PREOPERATIVE CLEARANCE VISIT - added 2026-08-02.",
+        "",
+        "Exists to solve two timing problems that no probability change could fix:",
+        "",
+        "  1. mFI-5 scores CHF over a -30..-1 day window, but the Cov_* chain fires",
+        "     7-90 days pre-index, so only ~18 of 379 patients had a CHF record",
+        "     inside 30 days, and the count moved with the delay draw.",
+        "  2. query_bmi_covariate_counts() resolves BMI as 'most recent direct",
+        "     reading wins', and stock Synthea writes a direct BMI (LOINC 39156-5)",
+        "     at essentially every wellness encounter - 358 of 379 index patients.",
+        "     A low weight recorded earlier can never win that ordering.",
+        "",
+        "Placing these events in a dedicated encounter a deterministic 1-30 days",
+        "before index satisfies both windows without compressing the 30 VA-FI",
+        "comorbidity onsets into one month or breaking the documented 7-90 day",
+        "urgent/semi-elective workup interval.",
+        "",
+        "SNOMED-CT 185349003 'Encounter for check up' -> OMOP 4085799 [vocab query \u2014 2026-08-02]; the",
+        "OMOP visit_concept_id comes from encounter_class 'outpatient', not from",
+        "this code - the same pattern Index_Diagnosis_Encounter already uses."
+      ],
+      "encounter_class": "outpatient",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "185349003",
+          "display": "Encounter for check up [vocab query \u2014 OMOP 4085799]"
+        }
+      ],
+      "reason": "exposure_condition",
+      "direct_transition": "Cov_CHF_Recent_Check"
+    },
+    "Cov_CHF_Recent_Check": {
+      "type": "Simple",
+      "remarks": [
+        "RISK-SCORE COVARIATE: chf within 30 days of index (mFI-5, 1 point).",
+        "",
+        "The module already emits CHF in the Cov_* chain (Cov_CHF_Onset, 30%), which",
+        "satisfies the Kraiss sVQI-FS -3650..-1 window - 124 of 379 patients. It does",
+        "NOT reliably satisfy the mFI-5 -30..-1 window, which measured only 18 of 379.",
+        "A second CHF record at preoperative cardiac clearance is clinically natural",
+        "(chronic heart failure re-documented before surgery) and lands deterministically",
+        "inside both windows.",
+        "Prevalence 35% of the cohort. (RESEARCHER_ADJUSTS)"
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.35,
+          "transition": "Cov_CHF_Recent_Onset"
+        },
+        {
+          "distribution": 0.65,
+          "transition": "Cov_Hgb_Check"
+        }
+      ]
+    },
+    "Cov_CHF_Recent_Onset": {
+      "type": "ConditionOnset",
+      "remarks": [
+        "SNOMED-CT 84114007 'Heart failure' -> OMOP 316139 (Condition) [vocab query \u2014 2026-08-02].",
+        "Same concept as Cov_CHF_Onset - deliberately a repeat record, not a new",
+        "concept, so both the mFI-5 and sVQI-FS chf items resolve from one code."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "84114007",
+          "display": "Heart failure [vocab query \u2014 OMOP 316139]"
+        }
+      ],
+      "direct_transition": "Cov_Hgb_Check"
+    },
+    "Cov_Hgb_Check": {
+      "type": "Simple",
+      "remarks": [
+        "RISK-SCORE COVARIATE: anemia - two different scores, two thresholds.",
+        "  Iannuzzi:  Hgb < 10 g/dL           (2 points)",
+        "  Kraiss:    Hgb < 13 M / < 12 F     (1 point)",
+        "",
+        "EVERY patient is measured, both arms, on purpose. Both scores set",
+        "missing_is_negative = FALSE for anemia, so an unmeasured patient is scored",
+        "UNKNOWN rather than not-anemic. Only 85 of 379 index patients had any Hgb in",
+        "the -365..-1 window before this state existed, which silently shrank the",
+        "denominator. A preoperative CBC is standard of care regardless.",
+        "",
+        "The 30% low arm (5.5-9.9) satisfies both thresholds. The 70% normal arm",
+        "(10.0-17.0) additionally trips the sex-specific Kraiss threshold for the part",
+        "of its range below 13 / 12, giving a realistic combined sVQI-FS rate near 50%."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.3,
+          "transition": "Cov_Hgb_Low"
+        },
+        {
+          "distribution": 0.7,
+          "transition": "Cov_Hgb_Normal"
+        }
+      ]
+    },
+    "Cov_Hgb_Low": {
+      "type": "Observation",
+      "remarks": [
+        "LOINC 718-7 'Hemoglobin [Mass/volume] in Blood' -> OMOP 3000963 [vocab query \u2014 2026-08-02].",
+        "5.5-9.9 g/dL: below the Iannuzzi 10 g/dL threshold and below both",
+        "sex-specific Kraiss thresholds.",
+        "Unit string 'g/dL' matches what stock Synthea already round-trips through",
+        "this ETL to unit_concept_id 8713 - do not change it casually, an unrecognised",
+        "unit string silently yields unit_concept_id 0 and the covariate reads absent."
+      ],
+      "category": "laboratory",
+      "codes": [
+        {
+          "system": "LOINC",
+          "code": "718-7",
+          "display": "Hemoglobin [Mass/volume] in Blood [vocab query \u2014 OMOP 3000963]"
+        }
+      ],
+      "range": {
+        "low": 5.5,
+        "high": 9.9
+      },
+      "unit": "g/dL",
+      "direct_transition": "Cov_Creatinine_Check"
+    },
+    "Cov_Hgb_Normal": {
+      "type": "Observation",
+      "remarks": [
+        "LOINC 718-7 -> OMOP 3000963 [vocab query \u2014 2026-08-02]. Normal-range arm, 10.0-17.0 g/dL.",
+        "Above the Iannuzzi threshold; the lower part of this range still trips the",
+        "sex-specific Kraiss threshold (< 13 male / < 12 female), which is intended."
+      ],
+      "category": "laboratory",
+      "codes": [
+        {
+          "system": "LOINC",
+          "code": "718-7",
+          "display": "Hemoglobin [Mass/volume] in Blood [vocab query \u2014 OMOP 3000963]"
+        }
+      ],
+      "range": {
+        "low": 10.0,
+        "high": 17.0
+      },
+      "unit": "g/dL",
+      "direct_transition": "Cov_Creatinine_Check"
+    },
+    "Cov_Creatinine_Check": {
+      "type": "Simple",
+      "remarks": [
+        "RISK-SCORE COVARIATE: renal_impairment (Kraiss sVQI-FS, 1 point) -",
+        "creatinine > 1.8 mg/dL, or dialysis.",
+        "",
+        "The dialysis arm already works via Cov_KidneyProc_Onset (OMOP 4146536, 46 of",
+        "379). The creatinine arm nominally worked too (104 of 379) but only from",
+        "stock Synthea values that reach 101.4 mg/dL - physiologically impossible and",
+        "not a defensible signal. Explicit module-authored values replace guesswork",
+        "with a stated distribution.",
+        "Prevalence 18% above threshold. (RESEARCHER_ADJUSTS)"
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.18,
+          "transition": "Cov_Creatinine_High"
+        },
+        {
+          "distribution": 0.82,
+          "transition": "Cov_Creatinine_Normal"
+        }
+      ]
+    },
+    "Cov_Creatinine_High": {
+      "type": "Observation",
+      "remarks": [
+        "LOINC 2160-0 'Creatinine [Mass/volume] in Serum or Plasma' -> OMOP 3016723 [vocab query \u2014 2026-08-02].",
+        "1.9-4.5 mg/dL: above the 1.8 mg/dL threshold in",
+        "query_renal_impairment_covariate_counts(), and clinically plausible for",
+        "CKD stage 3-4 without dialysis.",
+        "Unit 'mg/dL' -> unit_concept_id 8840 in this ETL."
+      ],
+      "category": "laboratory",
+      "codes": [
+        {
+          "system": "LOINC",
+          "code": "2160-0",
+          "display": "Creatinine [Mass/volume] in Serum or Plasma [vocab query \u2014 OMOP 3016723]"
+        }
+      ],
+      "range": {
+        "low": 1.9,
+        "high": 4.5
+      },
+      "unit": "mg/dL",
+      "direct_transition": "Cov_Underweight_Check"
+    },
+    "Cov_Creatinine_Normal": {
+      "type": "Observation",
+      "remarks": [
+        "LOINC 2160-0 -> OMOP 3016723 [vocab query \u2014 2026-08-02]. Normal-range arm, 0.6-1.4 mg/dL,",
+        "safely below the 1.8 mg/dL threshold."
+      ],
+      "category": "laboratory",
+      "codes": [
+        {
+          "system": "LOINC",
+          "code": "2160-0",
+          "display": "Creatinine [Mass/volume] in Serum or Plasma [vocab query \u2014 OMOP 3016723]"
+        }
+      ],
+      "range": {
+        "low": 0.6,
+        "high": 1.4
+      },
+      "unit": "mg/dL",
+      "direct_transition": "Cov_Underweight_Check"
+    },
+    "Cov_Underweight_Check": {
+      "type": "Simple",
+      "remarks": [
+        "RISK-SCORE COVARIATE: underweight, BMI < 18.5 (Kraiss sVQI-FS, 1 point).",
+        "Measured 1 of 379 before this state existed.",
+        "",
+        "WHY A DIRECT BMI OBSERVATION AND NOT A VitalSign STATE - two reasons:",
+        "  1. Synthea's VitalSign state only calls person.setVitalSign(); it writes no",
+        "     record at all, so it cannot produce a measurement row.",
+        "  2. query_bmi_covariate_counts() resolves BMI in three tiers and gives",
+        "     priority 1 to a DIRECT BMI reading (3038553 / 36304833), ordered by date",
+        "     descending. Stock Synthea writes a direct BMI at every wellness visit, so",
+        "     a low weight alone can never win the ordering.",
+        "Emitting a direct BMI here, 1-30 days pre-index, makes it the most recent",
+        "reading. Weight and height are emitted alongside so the tier-2 computed",
+        "fallback agrees with tier 1 for any consumer that ignores direct BMI.",
+        "Prevalence 10%. (RESEARCHER_ADJUSTS)"
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.1,
+          "transition": "Cov_BMI_Underweight"
+        },
+        {
+          "distribution": 0.9,
+          "transition": "Cov_BMI_Normal"
+        }
+      ]
+    },
+    "Cov_BMI_Underweight": {
+      "type": "Observation",
+      "remarks": [
+        "LOINC 39156-5 'Body mass index (BMI) [Ratio]' -> OMOP 3038553 [vocab query \u2014 2026-08-02].",
+        "14.5-18.2 kg/m2, entirely below the 18.5 threshold."
+      ],
+      "category": "laboratory",
+      "codes": [
+        {
+          "system": "LOINC",
+          "code": "39156-5",
+          "display": "Body mass index (BMI) [Ratio] [vocab query \u2014 OMOP 3038553]"
+        }
+      ],
+      "range": {
+        "low": 14.5,
+        "high": 18.2
+      },
+      "unit": "kg/m2",
+      "direct_transition": "Cov_Weight_Low"
+    },
+    "Cov_Weight_Low": {
+      "type": "Observation",
+      "remarks": [
+        "LOINC 29463-7 'Body weight' -> OMOP 3025315 (Measurement) [vocab query \u2014 2026-08-02].",
+        "38-50 kg, consistent with the low BMI above so the tier-2 weight/height",
+        "fallback in query_bmi_covariate_counts() reaches the same conclusion.",
+        "Unit 'kg' -> unit_concept_id 9529."
+      ],
+      "category": "laboratory",
+      "codes": [
+        {
+          "system": "LOINC",
+          "code": "29463-7",
+          "display": "Body weight [vocab query \u2014 OMOP 3025315]"
+        }
+      ],
+      "range": {
+        "low": 38,
+        "high": 50
+      },
+      "unit": "kg",
+      "direct_transition": "Cov_Height_Preop"
+    },
+    "Cov_BMI_Normal": {
+      "type": "Observation",
+      "remarks": [
+        "LOINC 39156-5 -> OMOP 3038553 [vocab query \u2014 2026-08-02]. Normal/overweight arm, 19.0-32.0 kg/m2.",
+        "Measuring everyone mirrors a real preoperative clearance and keeps the most",
+        "recent direct BMI inside the scoring window for the whole cohort."
+      ],
+      "category": "laboratory",
+      "codes": [
+        {
+          "system": "LOINC",
+          "code": "39156-5",
+          "display": "Body mass index (BMI) [Ratio] [vocab query \u2014 OMOP 3038553]"
+        }
+      ],
+      "range": {
+        "low": 19.0,
+        "high": 32.0
+      },
+      "unit": "kg/m2",
+      "direct_transition": "Cov_Height_Preop"
+    },
+    "Cov_Height_Preop": {
+      "type": "Observation",
+      "remarks": [
+        "LOINC 8302-2 'Body height' -> OMOP 3036277 (Measurement) [vocab query \u2014 2026-08-02].",
+        "155-180 cm. Needed by the tier-2 computed-BMI fallback",
+        "(weight_kg / height_m^2) in query_bmi_covariate_counts().",
+        "Unit 'cm' -> unit_concept_id 8582."
+      ],
+      "category": "laboratory",
+      "codes": [
+        {
+          "system": "LOINC",
+          "code": "8302-2",
+          "display": "Body height [vocab query \u2014 OMOP 3036277]"
+        }
+      ],
+      "range": {
+        "low": 155,
+        "high": 180
+      },
+      "unit": "cm",
+      "direct_transition": "Preop_Clearance_Encounter_End"
+    },
+    "Preop_Clearance_Encounter_End": {
+      "type": "EncounterEnd",
+      "remarks": [
+        "Closes the preoperative clearance visit. No discharge_disposition - this",
+        "is an outpatient encounter and only the index inpatient stay and",
+        "readmissions carry a NUBC disposition."
+      ],
+      "direct_transition": "Preop_To_Index_Delay"
+    },
+    "Preop_To_Index_Delay": {
+      "type": "Delay",
+      "remarks": [
+        "Preoperative clearance to index admission: 1-30 days.",
+        "Bounded at 30 so every lab and the CHF record above fall inside the",
+        "mFI-5 -30..-1 day window; bounded at >= 1 so nothing lands on the index",
+        "date itself, which every covariate lookback excludes (lookback_end = -1)."
+      ],
+      "range": {
+        "low": 1,
+        "high": 30,
         "unit": "days"
       },
       "direct_transition": "Index_Admission_Encounter"
@@ -1400,19 +2068,71 @@
         }
       ],
       "reason": "exposure_condition",
-      "direct_transition": "Index_Procedure"
+      "direct_transition": "Index_Procedure_Branch"
+    },
+    "Index_Procedure_Branch": {
+      "type": "Simple",
+      "remarks": [
+        "INDEX AMPUTATION LEVEL - added 2026-08-02.",
+        "Previously the module emitted only BKA, so every amputation-level covariate",
+        "downstream saw a constant.",
+        "40% AKA / 60% BKA approximates the observed mix in dysvascular major",
+        "amputation series. (RESEARCHER_ADJUSTS)",
+        "",
+        "Safe against pad-amp-ed-desc's readmission cohort (1797945): its exclusion",
+        "concept set '[DVI] Major Lower Extremity Amputation' already contains 4195136,",
+        "so AKA index stays are excluded from readmissions exactly as BKA stays are.",
+        "Verified against inst/cohorts/1797945.json on 2026-08-02."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.4,
+          "transition": "Index_Procedure_AKA"
+        },
+        {
+          "distribution": 0.6,
+          "transition": "Index_Procedure"
+        }
+      ]
+    },
+    "Index_Procedure_AKA": {
+      "type": "Procedure",
+      "remarks": [
+        "Index major lower extremity amputation - ABOVE-KNEE arm.",
+        "SNOMED-CT 79733001 'Amputation above-knee' -> OMOP 4195136 (Procedure) [vocab query \u2014 2026-08-02].",
+        "Listed in study_params.yaml > target > index_event > ancestor_concept_ids,",
+        "so it qualifies for the target cohort identically to the BKA code.",
+        "Duration 120-210 min - AKA runs somewhat longer than BKA."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "79733001",
+          "display": "Amputation above-knee [vocab query \u2014 OMOP 4195136]"
+        }
+      ],
+      "duration": {
+        "low": 120,
+        "high": 210,
+        "unit": "minutes"
+      },
+      "direct_transition": "Post_Index_Inpatient_Delay"
     },
     "Index_Procedure": {
       "type": "Procedure",
       "remarks": [
-        "Major lower extremity amputation (BKA as primary representative code).",
-        "SNOMED-CT 79733001 'Below-knee amputation' [vocab query \u2014 2026-07-05].",
-        "Covers: BKA (4338257), AKA (4143795), foot (4195136), toe (4242396),",
-        "        ankle (4264289), through-knee (36675618) \u2014 all in study_params.yaml.",
-        "Duration: 90-180 min (typical major amputation operative time).",
-        "RESEARCHER_ADJUSTS: expand to multiple Procedure states for sub-level",
-        "stratification (BKA vs. AKA) if needed for cohort diagnostics.",
-        "Verify: Rscript scripts/concept_lookup.R 'below knee amputation' Procedure"
+        "Index major lower extremity amputation - BELOW-KNEE arm.",
+        "SNOMED-CT 88312006 'Amputation of leg through tibia and fibula' -> OMOP 4338257 [vocab query \u2014 2026-08-02].",
+        "",
+        "CORRECTED 2026-08-02: the previous remarks named this code as SNOMED",
+        "79733001 'Below-knee amputation' and claimed a single state covered every",
+        "amputation level. Neither was true - 79733001 is Amputation ABOVE-knee",
+        "(OMOP 4195136), and only this one BKA code was ever emitted, so the",
+        "amputation-level covariates in pad-amp-ed-desc had no signal to distinguish.",
+        "The former remark also mislabelled 4195136 as 'foot' and 4143795 as",
+        "'above knee'; correct names are above-knee and through-knee respectively.",
+        "",
+        "Duration 90-180 min (typical major amputation operative time)."
       ],
       "codes": [
         {
@@ -1441,13 +2161,102 @@
         "high": 21,
         "unit": "days"
       },
-      "direct_transition": "Index_Encounter_End"
+      "direct_transition": "Discharge_Disposition_Branch"
     },
-    "Index_Encounter_End": {
+    "Discharge_Disposition_Branch": {
+      "type": "Simple",
+      "remarks": [
+        "DISCHARGE DISPOSITION GATE - drives the non-home discharge (NHD) outcome.",
+        "Replaces the former single Index_Encounter_End, which carried no",
+        "discharge_disposition at all, so every index visit landed in OMOP with",
+        "visit_occurrence.discharged_to_concept_id NULL and the NHD outcome",
+        "measured zero.",
+        "",
+        "All three branches re-converge on Post_Discharge_Observation_Delay so the",
+        "existing 90-day ED-visit and readmission outcome path is unchanged.",
+        "",
+        "Marginal split (RESEARCHER_ADJUSTS): 65% home / 22% SNF / 13% IRF, i.e.",
+        "~35% non-home. Real-world NHD after major lower extremity amputation runs",
+        "higher (60-75%); 35% is a deliberate enrichment choice that keeps the",
+        "dataset balanced for BOTH the NHD outcome and the pre-existing ED outcome,",
+        "and matches the enrichment the sibling pad_amp_nhd module already uses so",
+        "the two synthetic datasets stay comparable.",
+        "",
+        "LIMITATION: NHD and ED risk are independent here - a SNF-discharged patient",
+        "carries the same 35% ED risk as one sent home, which is clinically wrong",
+        "but consistent with this module's existing unconditional-incidence design",
+        "(see Outcome_Assessment remarks). To correlate them, split this into two",
+        "post-discharge paths with different Outcome_Assessment gates."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.65,
+          "transition": "Index_Discharge_Home"
+        },
+        {
+          "distribution": 0.22,
+          "transition": "Index_Discharge_SNF"
+        },
+        {
+          "distribution": 0.13,
+          "transition": "Index_Discharge_IRF"
+        }
+      ]
+    },
+    "Index_Discharge_Home": {
       "type": "EncounterEnd",
       "remarks": [
-        "Discharge from inpatient stay. Patient enters the 90-day ED visit window."
+        "Routine discharge home - NOT a non-home discharge.",
+        "outcome_nhd.sql resolves the home set dynamically from UB04 codes 01 and 06",
+        "plus CMS place-of-service 8536 and their 'Maps to' targets, so this visit is",
+        "excluded from the NHD outcome cohort.",
+        "NUBC 01 -> UB04 'Pt dis status' -> OMOP 581476 (Home Visit) [vocab query \u2014 2026-08-02].",
+        "The synthea-pad fork emits this as the DISCHARGE column of",
+        "encounters.csv; Step 5's post-INSERT fix-up in",
+        "scripts/etl/run_synthea_full_csv_builder_etl.R resolves it into",
+        "visit_occurrence.discharged_to_concept_id / discharged_to_source_value."
       ],
+      "discharge_disposition": {
+        "system": "NUBC",
+        "code": "01",
+        "display": "Discharged to home or self care (routine discharge)"
+      },
+      "direct_transition": "Post_Discharge_Observation_Delay"
+    },
+    "Index_Discharge_SNF": {
+      "type": "EncounterEnd",
+      "remarks": [
+        "Discharge to a skilled nursing facility - a NON-HOME discharge.",
+        "Most common non-home destination after major lower extremity amputation.",
+        "NUBC 03 -> UB04 'Pt dis status' -> OMOP 8863 (Skilled Nursing Facility) [vocab query \u2014 2026-08-02].",
+        "The synthea-pad fork emits this as the DISCHARGE column of",
+        "encounters.csv; Step 5's post-INSERT fix-up in",
+        "scripts/etl/run_synthea_full_csv_builder_etl.R resolves it into",
+        "visit_occurrence.discharged_to_concept_id / discharged_to_source_value."
+      ],
+      "discharge_disposition": {
+        "system": "NUBC",
+        "code": "03",
+        "display": "Discharged/transferred to skilled nursing facility (SNF)"
+      },
+      "direct_transition": "Post_Discharge_Observation_Delay"
+    },
+    "Index_Discharge_IRF": {
+      "type": "EncounterEnd",
+      "remarks": [
+        "Discharge to an inpatient rehabilitation facility - a NON-HOME discharge.",
+        "Typical for younger/fitter amputees being fitted for a prosthesis.",
+        "NUBC 62 -> UB04 'Pt dis status' -> OMOP 38004285 (Rehabilitation Hospital) [vocab query \u2014 2026-08-02].",
+        "The synthea-pad fork emits this as the DISCHARGE column of",
+        "encounters.csv; Step 5's post-INSERT fix-up in",
+        "scripts/etl/run_synthea_full_csv_builder_etl.R resolves it into",
+        "visit_occurrence.discharged_to_concept_id / discharged_to_source_value."
+      ],
+      "discharge_disposition": {
+        "system": "NUBC",
+        "code": "62",
+        "display": "Discharged/transferred to an inpatient rehabilitation facility (IRF)"
+      },
       "direct_transition": "Post_Discharge_Observation_Delay"
     },
     "Post_Discharge_Observation_Delay": {
@@ -1572,11 +2381,11 @@
       ],
       "distributed_transition": [
         {
-          "distribution": 0.70,
+          "distribution": 0.7,
           "transition": "ED_To_Readmission_Delay"
         },
         {
-          "distribution": 0.30,
+          "distribution": 0.3,
           "transition": "Terminal"
         }
       ]
@@ -1638,9 +2447,17 @@
     "Readmission_Encounter_End": {
       "type": "EncounterEnd",
       "remarks": [
-        "Closes the inpatient readmission encounter. Patient transitions to Terminal."
+        "Closes the inpatient readmission encounter. Patient transitions to Terminal.",
+        "Routine home discharge (NUBC 01) so this readmission visit is NOT counted",
+        "as a non-home discharge. outcome_nhd.sql emits one row per qualifying",
+        "inpatient visit, so a non-home code here would create a phantom NHD event."
       ],
-      "direct_transition": "Terminal"
+      "direct_transition": "Terminal",
+      "discharge_disposition": {
+        "system": "NUBC",
+        "code": "01",
+        "display": "Discharged to home or self care (routine discharge)"
+      }
     },
     "Terminal": {
       "type": "Terminal"
