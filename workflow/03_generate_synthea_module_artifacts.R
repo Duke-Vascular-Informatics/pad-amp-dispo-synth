@@ -193,6 +193,40 @@ if (is.na(target_modules_dir)) {
 
 target_module_path <- file.path(target_modules_dir, basename(module_path))
 
+# ---------------------------------------------------------------------------
+# Prune modules this repo synced under a DIFFERENT name on an earlier run.
+#
+# Why this exists: Step 4 runs `./run_synthea` with no -m module filter, so
+# Synthea loads and executes EVERY .json in this directory. The removal below
+# only deletes the file matching the current basename, so a module renamed
+# between runs left its old copy behind and Synthea silently ran both. That
+# actually happened here: the 2026-07-20 generation ran both pad_amp_ed.json
+# and a pre-split pad_amp_ed_desc.json, each emitting the same index
+# amputation procedure (SNOMED 88312006), so patients could be processed by
+# two overlapping amputation pathways. Discovered 2026-07-31 during the
+# pad-amp-dispo rename.
+#
+# The manifest records exactly what this repo put here, so pruning can never
+# touch a stock Synthea module (85 of them ship in the checkout) — only files
+# we wrote ourselves on a previous run.
+# ---------------------------------------------------------------------------
+sync_manifest_path <- file.path(target_modules_dir, ".synced_by_this_repo")
+if (file.exists(sync_manifest_path)) {
+  previously_synced <- readLines(sync_manifest_path, warn = FALSE)
+  previously_synced <- previously_synced[nzchar(previously_synced)]
+  stale <- setdiff(previously_synced, basename(module_path))
+  for (stale_name in stale) {
+    stale_path <- file.path(target_modules_dir, stale_name)
+    if (file.exists(stale_path)) {
+      if (!file.remove(stale_path)) {
+        stop("Failed to remove stale synced module: ", stale_path)
+      }
+      cat("[PRUNE] Removed stale module synced under a former name: ",
+          stale_name, "\n", sep = "")
+    }
+  }
+}
+
 # Replace prior version explicitly to avoid any ambiguity about which file is
 # active in the Synthea checkout.
 if (file.exists(target_module_path)) {
@@ -221,7 +255,32 @@ if (!identical(src_size, dst_size)) {
   )
 }
 
+writeLines(basename(module_path), sync_manifest_path)
+
 cat("Synthea module synced to: ", target_module_path, "\n", sep = "")
+
+# Backstop for modules synced before the manifest existed (or by a sibling repo).
+# Workspace-authored modules open their remarks with the "SYNTHEA MODULE —"
+# header convention; none of the 85 stock Synthea modules contain that string,
+# so it discriminates cleanly. Stock modules are never flagged.
+other_modules <- setdiff(
+  list.files(target_modules_dir, pattern = "\\.json$"),
+  basename(module_path)
+)
+foreign_custom <- Filter(function(f) {
+  any(grepl("SYNTHEA MODULE",
+            readLines(file.path(target_modules_dir, f), warn = FALSE),
+            fixed = TRUE))
+}, other_modules)
+if (length(foreign_custom) > 0) {
+  stop(
+    "Workspace-authored module(s) left in the Synthea runtime directory: ",
+    paste(foreign_custom, collapse = ", "), ".\n",
+    "  Step 4 runs Synthea with no -m filter, so these WILL also execute and ",
+    "contaminate the generated cohort.\n",
+    "  Remove them from ", target_modules_dir, " before running Step 4."
+  )
+}
 
 } # end else (target_modules_dir found)
 
