@@ -90,11 +90,7 @@
     "pre-flight can assert an exact expected count rather than eyeball a total.",
     "If the pre-flight passes whether the SQL is right or wrong, the dataset failed.",
     "",
-    "  amp_decoy_early_revision  days 1-21 after a GUILLOTINE index. MoRe's window",
-    "                            starts at day 22 for guillotine/disarticulation, so",
-    "                            these are the expected closure and must NOT count.",
-    "                            A SQL applying the 1-365 definitive window to",
-    "                            guillotine cases will wrongly count them.",
+    "  (amp_decoy_early_revision has MOVED to the base module — see below.)",
     "  amp_decoy_contralateral   correct timing, correct level, WRONG LIMB.",
     "  amp_decoy_toe_or_ray      never an incident level and never 'same or higher'",
     "                            than TM/TT/TF. Matters because the workspace's",
@@ -129,6 +125,59 @@
     "  incident TM amputation were coded as a subsequent TM amputation and",
     "  classified as a re-amputation at the same level.' Note 'all TM codes' —",
     "  BROADER than the ICD-9 84.3 route in §14 entry 18.",
+    "",
+    "===========================================================================",
+    "⛔ BASE-MODULE CONTRACT: THE GUILLOTINE SEQUENCE IS NOT IN THIS MODULE",
+    "===========================================================================",
+    "MOVED OUT 2026-08-06. An earlier version of this module emitted the guillotine",
+    "closure itself. That was wrong twice over:",
+    "",
+    "  1. WRONG CODE. It emitted SNOMED 180048002 'Revision coverage of amputation",
+    "     stump' (OMOP 4078404). A guillotine closure is NOT a stump revision — it is",
+    "     a SECOND DEFINITIVE AMPUTATION CODE AT THE SAME LEVEL. In claims the",
+    "     sequence is a BKA code and then another BKA code 1-2 weeks later (CPT 27882",
+    "     open/circular, then definitive 27880; in SNOMED, 88312006 twice).",
+    "     This also gutted the test: a stump-revision concept is an EASY decoy that a",
+    "     naive SQL may not even carry in its amputation set. Two IDENTICAL amputation",
+    "     codes separated only by timing is the dangerous case, and the one worth",
+    "     building.",
+    "",
+    "  2. WRONG PLACE. Per MoRe's Methods, the forward three-week search exists 'to",
+    "     classify the incident level' — so the closure DEFINES the index event rather",
+    "     than following it. A guillotine TT closed at TT is an incident TT; closed at",
+    "     TF, the incident level IS TF. That is index construction, which belongs to",
+    "     whichever module owns the index procedure. This module declares",
+    "     amp_index_level and amp_index_definitive as INPUTS — emitting the closure",
+    "     here contradicted its own interface.",
+    "",
+    "WHAT THE BASE MODULE MUST DO (all three branches — registry acceptance",
+    "criterion 2 requires them, and the old version implemented only the first):",
+    "",
+    "  a. CLOSURE WITHIN 3 WEEKS (days 1-21). Emit a second DEFINITIVE amputation",
+    "     code. That code sets amp_index_level:",
+    "        ~85-90%  same level as the guillotine   (TT -> TT, TF -> TF)",
+    "        ~10-15%  escalated at closure           (TT -> TF)",
+    "     Set amp_index_definitive = false, since MoRe's 22-365 day re-amputation",
+    "     window applies to these patients. Set amp_decoy_early_revision = true: the",
+    "     second code is part of the INDEX EVENT and must NOT count as a",
+    "     re-amputation. This is the strongest negative control in the dataset.",
+    "     ⚠️ Because escalation shifts the level mix toward TF, the base module's",
+    "     INITIAL level draw must be corrected so the FINAL mix still lands on the",
+    "     published 33.8 / 43.7 / 22.5.",
+    "",
+    "  b. CLOSURE AFTER 3 WEEKS (day 22+). MoRe: 'an error in the initial coding was",
+    "     presumed and the guillotine code was recoded as a definitive amputation.'",
+    "     So amp_index_level = the GUILLOTINE's level, amp_index_definitive = true,",
+    "     and the late closure is then ELIGIBLE as a re-amputation. Note this inverts",
+    "     branch (a): the same code at day 20 vs day 25 flips from index-event to",
+    "     outcome. That pair is the sharpest test of the two-window rule.",
+    "",
+    "  c. NO CLOSURE AT ALL. Same recoding as (b) — amp_index_definitive = true at the",
+    "     guillotine's level. MoRe states both branches; ref 10 states only the",
+    "     >3-week one, so an implementation matching ref 10 misses this.",
+    "",
+    "This module then handles ONLY the outcome side, and keeps the day-22 suppression",
+    "(Reamp_Window_Eligibility) because that is outcome logic, not index logic.",
     "",
     "===========================================================================",
     "TWO OPEN PROBLEMS. READ BEFORE GENERATING.",
@@ -170,12 +219,10 @@
     "==========================================================================="
   ],
   "states": {
-
     "Initial": {
       "type": "Initial",
       "direct_transition": "Index_Attributes_Guard"
     },
-
     "Index_Attributes_Guard": {
       "type": "Guard",
       "remarks": [
@@ -190,7 +237,6 @@
       },
       "direct_transition": "Init_Month_Counter"
     },
-
     "Init_Month_Counter": {
       "type": "SetAttribute",
       "attribute": "amp_month",
@@ -199,60 +245,22 @@
     },
     "Init_Reamp_Flag": {
       "type": "SetAttribute",
-      "remarks": ["Explicit false rather than nil, so the QC query can distinguish 'checked, did not happen' from 'never evaluated'."],
+      "remarks": [
+        "Explicit false rather than nil, so the QC query can distinguish 'checked, did not happen' from 'never evaluated'."
+      ],
       "attribute": "amp_reamp_occurred",
       "value": false,
-      "direct_transition": "Guillotine_Closure_Check"
+      "direct_transition": "Month_Tick"
     },
-
-    "Guillotine_Closure_Check": {
-      "type": "Simple",
-      "remarks": [
-        "A guillotine is an OPEN amputation — closure is part of the index",
-        "operation, not a hazard, and happens to essentially every guillotine",
-        "patient. MoRe allows for it explicitly by starting their re-amputation",
-        "window at day 22 'to allow for revisions within three weeks'.",
-        "",
-        "CORRECTED 2026-08-06: an earlier version gated this closure behind a",
-        "month-1 re-amputation hazard draw, so it reached only ~0.6% of patients",
-        "(20% guillotine x 2.9% monthly hazard). The decoy that tests THE most",
-        "important rule — the two-window distinction — was the rarest event in the",
-        "dataset, about one patient per 200-patient generation, i.e. statistically",
-        "useless. Emitting it unconditionally for guillotine patients takes it to",
-        "~20%, matching the guillotine share."
-      ],
-      "conditional_transition": [
-        {
-          "condition": {
-            "condition_type": "Attribute",
-            "attribute": "amp_index_definitive",
-            "operator": "==",
-            "value": false
-          },
-          "transition": "Guillotine_Closure_Delay"
-        },
-        { "transition": "Month_Tick" }
-      ]
-    },
-
-    "Guillotine_Closure_Delay": {
-      "type": "Delay",
-      "remarks": [
-        "Days 1-21 — inside MoRe's exclusion window by construction. Day 21 is the",
-        "boundary that must NOT count, against day 22 which must."
-      ],
-      "range": { "low": 1, "high": 21, "unit": "days" },
-      "direct_transition": "Decoy_Early_Revision_Procedure"
-    },
-
     "Month_Tick": {
       "type": "Counter",
-      "remarks": ["Slice 1..12. The loop exit tests amp_month >= 12."],
+      "remarks": [
+        "Slice 1..12. The loop exit tests amp_month >= 12."
+      ],
       "attribute": "amp_month",
       "action": "increment",
       "direct_transition": "Month_Delay"
     },
-
     "Month_Delay": {
       "type": "Delay",
       "remarks": [
@@ -263,10 +271,13 @@
         "⚠️ Consequence for QC: a small number of month-12 events land after day 365",
         "and must NOT be counted. The QC query has to assert that, not assume it."
       ],
-      "range": { "low": 30, "high": 31, "unit": "days" },
+      "range": {
+        "low": 30,
+        "high": 31,
+        "unit": "days"
+      },
       "direct_transition": "Reamp_Already_Occurred_Check"
     },
-
     "Reamp_Already_Occurred_Check": {
       "type": "Simple",
       "remarks": [
@@ -284,10 +295,11 @@
           },
           "transition": "Death_Hazard_After_Reamp"
         },
-        { "transition": "Reamp_Level_Router" }
+        {
+          "transition": "Reamp_Level_Router"
+        }
       ]
     },
-
     "Reamp_Level_Router": {
       "type": "Simple",
       "remarks": [
@@ -297,42 +309,76 @@
       ],
       "conditional_transition": [
         {
-          "condition": { "condition_type": "Attribute", "attribute": "amp_index_level", "operator": "==", "value": "TM" },
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "amp_index_level",
+            "operator": "==",
+            "value": "TM"
+          },
           "transition": "TM_Monthly_Reamp_Hazard"
         },
         {
-          "condition": { "condition_type": "Attribute", "attribute": "amp_index_level", "operator": "==", "value": "TT" },
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "amp_index_level",
+            "operator": "==",
+            "value": "TT"
+          },
           "transition": "TT_Monthly_Reamp_Hazard"
         },
-        { "transition": "TF_Monthly_Reamp_Hazard" }
+        {
+          "transition": "TF_Monthly_Reamp_Hazard"
+        }
       ]
     },
-
     "TM_Monthly_Reamp_Hazard": {
       "type": "Simple",
-      "remarks": ["TM: 0.0403/month (1.40x base). Most room to progress. RESEARCHER_ADJUSTS."],
+      "remarks": [
+        "TM: 0.0403/month (1.40x base). Most room to progress. RESEARCHER_ADJUSTS."
+      ],
       "distributed_transition": [
-        { "distribution": 0.0403, "transition": "Reamp_Window_Eligibility" },
-        { "distribution": 0.9597, "transition": "Death_Hazard_Baseline" }
+        {
+          "distribution": 0.0403,
+          "transition": "Reamp_Window_Eligibility"
+        },
+        {
+          "distribution": 0.9597,
+          "transition": "Death_Hazard_Baseline"
+        }
       ]
     },
     "TT_Monthly_Reamp_Hazard": {
       "type": "Simple",
-      "remarks": ["TT: 0.0288/month — the solved base rate."],
+      "remarks": [
+        "TT: 0.0288/month — the solved base rate."
+      ],
       "distributed_transition": [
-        { "distribution": 0.0288, "transition": "Reamp_Window_Eligibility" },
-        { "distribution": 0.9712, "transition": "Death_Hazard_Baseline" }
+        {
+          "distribution": 0.0288,
+          "transition": "Reamp_Window_Eligibility"
+        },
+        {
+          "distribution": 0.9712,
+          "transition": "Death_Hazard_Baseline"
+        }
       ]
     },
     "TF_Monthly_Reamp_Hazard": {
       "type": "Simple",
-      "remarks": ["TF: 0.0173/month (0.60x base). No higher LE level exists within MoRe's scheme. RESEARCHER_ADJUSTS."],
+      "remarks": [
+        "TF: 0.0173/month (0.60x base). No higher LE level exists within MoRe's scheme. RESEARCHER_ADJUSTS."
+      ],
       "distributed_transition": [
-        { "distribution": 0.0173, "transition": "Reamp_Window_Eligibility" },
-        { "distribution": 0.9827, "transition": "Death_Hazard_Baseline" }
+        {
+          "distribution": 0.0173,
+          "transition": "Reamp_Window_Eligibility"
+        },
+        {
+          "distribution": 0.9827,
+          "transition": "Death_Hazard_Baseline"
+        }
       ]
     },
-
     "Reamp_Window_Eligibility": {
       "type": "Simple",
       "remarks": [
@@ -348,16 +394,27 @@
           "condition": {
             "condition_type": "And",
             "conditions": [
-              { "condition_type": "Attribute", "attribute": "amp_index_definitive", "operator": "==", "value": false },
-              { "condition_type": "Attribute", "attribute": "amp_month", "operator": "<=", "value": 1 }
+              {
+                "condition_type": "Attribute",
+                "attribute": "amp_index_definitive",
+                "operator": "==",
+                "value": false
+              },
+              {
+                "condition_type": "Attribute",
+                "attribute": "amp_month",
+                "operator": "<=",
+                "value": 1
+              }
             ]
           },
           "transition": "Death_Hazard_Baseline"
         },
-        { "transition": "Reamp_Subtype_Router" }
+        {
+          "transition": "Reamp_Subtype_Router"
+        }
       ]
     },
-
     "Reamp_Subtype_Router": {
       "type": "Simple",
       "remarks": [
@@ -369,43 +426,80 @@
       ],
       "conditional_transition": [
         {
-          "condition": { "condition_type": "Attribute", "attribute": "amp_index_level", "operator": "==", "value": "TM" },
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "amp_index_level",
+            "operator": "==",
+            "value": "TM"
+          },
           "transition": "TM_Reamp_Subtype"
         },
         {
-          "condition": { "condition_type": "Attribute", "attribute": "amp_index_level", "operator": "==", "value": "TT" },
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "amp_index_level",
+            "operator": "==",
+            "value": "TT"
+          },
           "transition": "TT_Reamp_Subtype"
         },
-        { "transition": "TF_Reamp_Subtype" }
+        {
+          "transition": "TF_Reamp_Subtype"
+        }
       ]
     },
-
     "TM_Reamp_Subtype": {
       "type": "Simple",
-      "remarks": ["RESEARCHER_ADJUSTS. Both arms must stay non-trivial or the 'all TM codes count' rule is never exercised."],
+      "remarks": [
+        "RESEARCHER_ADJUSTS. Both arms must stay non-trivial or the 'all TM codes count' rule is never exercised."
+      ],
       "distributed_transition": [
-        { "distribution": 0.55, "transition": "Reamp_TM_Same_Level" },
-        { "distribution": 0.45, "transition": "Reamp_TM_To_Higher" }
+        {
+          "distribution": 0.55,
+          "transition": "Reamp_TM_Same_Level"
+        },
+        {
+          "distribution": 0.45,
+          "transition": "Reamp_TM_To_Higher"
+        }
       ]
     },
     "TT_Reamp_Subtype": {
       "type": "Simple",
-      "remarks": ["All three sub-types available. RESEARCHER_ADJUSTS."],
+      "remarks": [
+        "All three sub-types available. RESEARCHER_ADJUSTS."
+      ],
       "distributed_transition": [
-        { "distribution": 0.30, "transition": "Reamp_Soft_Tissue_Revision" },
-        { "distribution": 0.35, "transition": "Reamp_TT_Same_Level" },
-        { "distribution": 0.35, "transition": "Reamp_TT_To_TF" }
+        {
+          "distribution": 0.3,
+          "transition": "Reamp_Soft_Tissue_Revision"
+        },
+        {
+          "distribution": 0.35,
+          "transition": "Reamp_TT_Same_Level"
+        },
+        {
+          "distribution": 0.35,
+          "transition": "Reamp_TT_To_TF"
+        }
       ]
     },
     "TF_Reamp_Subtype": {
       "type": "Simple",
-      "remarks": ["No higher LE level above TF in MoRe's scheme, so revision and same-level only. This asymmetry is real."],
+      "remarks": [
+        "No higher LE level above TF in MoRe's scheme, so revision and same-level only. This asymmetry is real."
+      ],
       "distributed_transition": [
-        { "distribution": 0.45, "transition": "Reamp_Soft_Tissue_Revision" },
-        { "distribution": 0.55, "transition": "Reamp_TF_Same_Level" }
+        {
+          "distribution": 0.45,
+          "transition": "Reamp_Soft_Tissue_Revision"
+        },
+        {
+          "distribution": 0.55,
+          "transition": "Reamp_TF_Same_Level"
+        }
       ]
     },
-
     "Reamp_Soft_Tissue_Revision": {
       "type": "Procedure",
       "remarks": [
@@ -414,91 +508,170 @@
         "code MoRe's ref 11 used. TT/TF only — TM bypasses this state."
       ],
       "codes": [
-        { "system": "SNOMED-CT", "code": "180048002", "display": "Revision coverage of amputation stump [vocab query — OMOP 4078404]" }
+        {
+          "system": "SNOMED-CT",
+          "code": "180048002",
+          "display": "Revision coverage of amputation stump [vocab query — OMOP 4078404]"
+        }
       ],
-      "duration": { "low": 45, "high": 120, "unit": "minutes" },
+      "duration": {
+        "low": 45,
+        "high": 120,
+        "unit": "minutes"
+      },
       "direct_transition": "Set_Reamp_Subtype_SoftTissue"
     },
     "Reamp_TM_Same_Level": {
       "type": "Procedure",
-      "remarks": ["Sub-type (b), TM special case. SNOMED-CT 265739006 -> OMOP 4143797 [vocab query 2026-08-06]. Catalog: forefoot_midfoot_amputation, [DVI] 1891165."],
-      "codes": [
-        { "system": "SNOMED-CT", "code": "265739006", "display": "Amputation through metatarsal bones [vocab query — OMOP 4143797]" }
+      "remarks": [
+        "Sub-type (b), TM special case. SNOMED-CT 265739006 -> OMOP 4143797 [vocab query 2026-08-06]. Catalog: forefoot_midfoot_amputation, [DVI] 1891165."
       ],
-      "duration": { "low": 60, "high": 150, "unit": "minutes" },
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "265739006",
+          "display": "Amputation through metatarsal bones [vocab query — OMOP 4143797]"
+        }
+      ],
+      "duration": {
+        "low": 60,
+        "high": 150,
+        "unit": "minutes"
+      },
       "direct_transition": "Set_Reamp_Subtype_SameLevel"
     },
     "Reamp_TT_Same_Level": {
       "type": "Procedure",
-      "remarks": ["Sub-type (b), TT. SNOMED-CT 88312006 -> OMOP 4338257 [vocab query 2026-08-06]."],
-      "codes": [
-        { "system": "SNOMED-CT", "code": "88312006", "display": "Amputation of leg through tibia and fibula [vocab query — OMOP 4338257]" }
+      "remarks": [
+        "Sub-type (b), TT. SNOMED-CT 88312006 -> OMOP 4338257 [vocab query 2026-08-06]."
       ],
-      "duration": { "low": 90, "high": 180, "unit": "minutes" },
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "88312006",
+          "display": "Amputation of leg through tibia and fibula [vocab query — OMOP 4338257]"
+        }
+      ],
+      "duration": {
+        "low": 90,
+        "high": 180,
+        "unit": "minutes"
+      },
       "direct_transition": "Set_Reamp_Subtype_SameLevel"
     },
     "Reamp_TF_Same_Level": {
       "type": "Procedure",
-      "remarks": ["Sub-type (b), TF. SNOMED-CT 79733001 -> OMOP 4195136 [vocab query 2026-08-06]."],
-      "codes": [
-        { "system": "SNOMED-CT", "code": "79733001", "display": "Amputation above-knee [vocab query — OMOP 4195136]" }
+      "remarks": [
+        "Sub-type (b), TF. SNOMED-CT 79733001 -> OMOP 4195136 [vocab query 2026-08-06]."
       ],
-      "duration": { "low": 120, "high": 210, "unit": "minutes" },
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "79733001",
+          "display": "Amputation above-knee [vocab query — OMOP 4195136]"
+        }
+      ],
+      "duration": {
+        "low": 120,
+        "high": 210,
+        "unit": "minutes"
+      },
       "direct_transition": "Set_Reamp_Subtype_SameLevel"
     },
     "Reamp_TM_To_Higher": {
       "type": "Simple",
-      "remarks": ["Sub-type (c) from TM. RESEARCHER_ADJUSTS — TM usually progresses to TT rather than straight to TF."],
+      "remarks": [
+        "Sub-type (c) from TM. RESEARCHER_ADJUSTS — TM usually progresses to TT rather than straight to TF."
+      ],
       "distributed_transition": [
-        { "distribution": 0.75, "transition": "Reamp_Higher_TT" },
-        { "distribution": 0.25, "transition": "Reamp_Higher_TF" }
+        {
+          "distribution": 0.75,
+          "transition": "Reamp_Higher_TT"
+        },
+        {
+          "distribution": 0.25,
+          "transition": "Reamp_Higher_TF"
+        }
       ]
     },
     "Reamp_Higher_TT": {
       "type": "Procedure",
       "codes": [
-        { "system": "SNOMED-CT", "code": "88312006", "display": "Amputation of leg through tibia and fibula [vocab query — OMOP 4338257]" }
+        {
+          "system": "SNOMED-CT",
+          "code": "88312006",
+          "display": "Amputation of leg through tibia and fibula [vocab query — OMOP 4338257]"
+        }
       ],
-      "duration": { "low": 90, "high": 180, "unit": "minutes" },
+      "duration": {
+        "low": 90,
+        "high": 180,
+        "unit": "minutes"
+      },
       "direct_transition": "Set_Reamp_Subtype_Higher"
     },
     "Reamp_TT_To_TF": {
       "type": "Procedure",
-      "remarks": ["The canonical progression MoRe cites (TT -> TF)."],
-      "codes": [
-        { "system": "SNOMED-CT", "code": "79733001", "display": "Amputation above-knee [vocab query — OMOP 4195136]" }
+      "remarks": [
+        "The canonical progression MoRe cites (TT -> TF)."
       ],
-      "duration": { "low": 120, "high": 210, "unit": "minutes" },
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "79733001",
+          "display": "Amputation above-knee [vocab query — OMOP 4195136]"
+        }
+      ],
+      "duration": {
+        "low": 120,
+        "high": 210,
+        "unit": "minutes"
+      },
       "direct_transition": "Set_Reamp_Subtype_Higher"
     },
     "Reamp_Higher_TF": {
       "type": "Procedure",
       "codes": [
-        { "system": "SNOMED-CT", "code": "79733001", "display": "Amputation above-knee [vocab query — OMOP 4195136]" }
+        {
+          "system": "SNOMED-CT",
+          "code": "79733001",
+          "display": "Amputation above-knee [vocab query — OMOP 4195136]"
+        }
       ],
-      "duration": { "low": 120, "high": 210, "unit": "minutes" },
+      "duration": {
+        "low": 120,
+        "high": 210,
+        "unit": "minutes"
+      },
       "direct_transition": "Set_Reamp_Subtype_Higher"
     },
-
     "Set_Reamp_Subtype_SoftTissue": {
-      "type": "SetAttribute", "attribute": "amp_reamp_subtype", "value": "soft_tissue_revision",
+      "type": "SetAttribute",
+      "attribute": "amp_reamp_subtype",
+      "value": "soft_tissue_revision",
       "direct_transition": "Set_Reamp_Occurred"
     },
     "Set_Reamp_Subtype_SameLevel": {
-      "type": "SetAttribute", "attribute": "amp_reamp_subtype", "value": "same_level",
+      "type": "SetAttribute",
+      "attribute": "amp_reamp_subtype",
+      "value": "same_level",
       "direct_transition": "Set_Reamp_Occurred"
     },
     "Set_Reamp_Subtype_Higher": {
-      "type": "SetAttribute", "attribute": "amp_reamp_subtype", "value": "higher_level",
+      "type": "SetAttribute",
+      "attribute": "amp_reamp_subtype",
+      "value": "higher_level",
       "direct_transition": "Set_Reamp_Occurred"
     },
     "Set_Reamp_Occurred": {
       "type": "SetAttribute",
-      "remarks": ["Ground truth for QC: compare against what the cohort SQL detects, per sub-type and per level."],
-      "attribute": "amp_reamp_occurred", "value": true,
+      "remarks": [
+        "Ground truth for QC: compare against what the cohort SQL detects, per sub-type and per level."
+      ],
+      "attribute": "amp_reamp_occurred",
+      "value": true,
       "direct_transition": "Reamp_Laterality_Mix"
     },
-
     "Reamp_Laterality_Mix": {
       "type": "Simple",
       "remarks": [
@@ -509,24 +682,38 @@
         "of intent until the ETL populates a modifier. RESEARCHER_ADJUSTS."
       ],
       "distributed_transition": [
-        { "distribution": 0.80, "transition": "Set_Reamp_Lat_Ipsilateral" },
-        { "distribution": 0.15, "transition": "Set_Reamp_Lat_Unknown" },
-        { "distribution": 0.05, "transition": "Set_Reamp_Lat_Bilateral" }
+        {
+          "distribution": 0.8,
+          "transition": "Set_Reamp_Lat_Ipsilateral"
+        },
+        {
+          "distribution": 0.15,
+          "transition": "Set_Reamp_Lat_Unknown"
+        },
+        {
+          "distribution": 0.05,
+          "transition": "Set_Reamp_Lat_Bilateral"
+        }
       ]
     },
     "Set_Reamp_Lat_Ipsilateral": {
-      "type": "SetAttribute", "attribute": "amp_reamp_laterality", "value": "ipsilateral",
+      "type": "SetAttribute",
+      "attribute": "amp_reamp_laterality",
+      "value": "ipsilateral",
       "direct_transition": "Death_Hazard_After_Reamp"
     },
     "Set_Reamp_Lat_Unknown": {
-      "type": "SetAttribute", "attribute": "amp_reamp_laterality", "value": "unknown",
+      "type": "SetAttribute",
+      "attribute": "amp_reamp_laterality",
+      "value": "unknown",
       "direct_transition": "Death_Hazard_After_Reamp"
     },
     "Set_Reamp_Lat_Bilateral": {
-      "type": "SetAttribute", "attribute": "amp_reamp_laterality", "value": "bilateral",
+      "type": "SetAttribute",
+      "attribute": "amp_reamp_laterality",
+      "value": "bilateral",
       "direct_transition": "Death_Hazard_After_Reamp"
     },
-
     "Death_Hazard_Baseline": {
       "type": "Simple",
       "remarks": [
@@ -535,8 +722,14 @@
         "MoRe's 'the re-amputation preceded death' constraint structural."
       ],
       "distributed_transition": [
-        { "distribution": 0.0156, "transition": "Death_State" },
-        { "distribution": 0.9844, "transition": "Decoy_Hazard_Check" }
+        {
+          "distribution": 0.0156,
+          "transition": "Death_State"
+        },
+        {
+          "distribution": 0.9844,
+          "transition": "Decoy_Hazard_Check"
+        }
       ]
     },
     "Death_Hazard_After_Reamp": {
@@ -548,11 +741,16 @@
         "distribution, not stated by MoRe — see the header."
       ],
       "distributed_transition": [
-        { "distribution": 0.0289, "transition": "Death_State" },
-        { "distribution": 0.9711, "transition": "Decoy_Hazard_Check" }
+        {
+          "distribution": 0.0289,
+          "transition": "Death_State"
+        },
+        {
+          "distribution": 0.9711,
+          "transition": "Decoy_Hazard_Check"
+        }
       ]
     },
-
     "Death_State": {
       "type": "Death",
       "remarks": [
@@ -564,10 +762,11 @@
       "direct_transition": "Set_Death_1y"
     },
     "Set_Death_1y": {
-      "type": "SetAttribute", "attribute": "amp_death_1y", "value": true,
+      "type": "SetAttribute",
+      "attribute": "amp_death_1y",
+      "value": true,
       "direct_transition": "Terminal"
     },
-
     "Decoy_Hazard_Check": {
       "type": "Simple",
       "remarks": [
@@ -577,31 +776,20 @@
         "at least one decoy over 12 months. RESEARCHER_ADJUSTS."
       ],
       "distributed_transition": [
-        { "distribution": 0.009, "transition": "Decoy_Contralateral_Procedure" },
-        { "distribution": 0.006, "transition": "Decoy_Toe_Or_Ray_Subtype" },
-        { "distribution": 0.985, "transition": "Month_Loop_Check" }
+        {
+          "distribution": 0.009,
+          "transition": "Decoy_Contralateral_Procedure"
+        },
+        {
+          "distribution": 0.006,
+          "transition": "Decoy_Toe_Or_Ray_Subtype"
+        },
+        {
+          "distribution": 0.985,
+          "transition": "Month_Loop_Check"
+        }
       ]
     },
-
-    "Decoy_Early_Revision_Procedure": {
-      "type": "Procedure",
-      "remarks": [
-        "DECOY 1 — the expected closure of a GUILLOTINE index, inside MoRe's day",
-        "1-21 exclusion. Same CODE as a real revision; only the TIMING makes it",
-        "non-qualifying, which is the whole point. A SQL applying the 1-365",
-        "definitive window to guillotine cases will wrongly count these."
-      ],
-      "codes": [
-        { "system": "SNOMED-CT", "code": "180048002", "display": "Revision coverage of amputation stump [vocab query — OMOP 4078404]" }
-      ],
-      "duration": { "low": 30, "high": 90, "unit": "minutes" },
-      "direct_transition": "Set_Decoy_Early"
-    },
-    "Set_Decoy_Early": {
-      "type": "SetAttribute", "attribute": "amp_decoy_early_revision", "value": true,
-      "direct_transition": "Month_Tick"
-    },
-
     "Decoy_Contralateral_Procedure": {
       "type": "Procedure",
       "remarks": [
@@ -612,16 +800,25 @@
         "like a SQL bug. Resolve before scoring this control."
       ],
       "codes": [
-        { "system": "SNOMED-CT", "code": "88312006", "display": "Amputation of leg through tibia and fibula [vocab query — OMOP 4338257]" }
+        {
+          "system": "SNOMED-CT",
+          "code": "88312006",
+          "display": "Amputation of leg through tibia and fibula [vocab query — OMOP 4338257]"
+        }
       ],
-      "duration": { "low": 90, "high": 180, "unit": "minutes" },
+      "duration": {
+        "low": 90,
+        "high": 180,
+        "unit": "minutes"
+      },
       "direct_transition": "Set_Decoy_Contralateral"
     },
     "Set_Decoy_Contralateral": {
-      "type": "SetAttribute", "attribute": "amp_decoy_contralateral", "value": true,
+      "type": "SetAttribute",
+      "attribute": "amp_decoy_contralateral",
+      "value": true,
       "direct_transition": "Month_Loop_Check"
     },
-
     "Decoy_Toe_Or_Ray_Subtype": {
       "type": "Simple",
       "remarks": [
@@ -633,17 +830,33 @@
         "See catalog toe_amputation ([DVI] 1891164)."
       ],
       "distributed_transition": [
-        { "distribution": 0.6, "transition": "Decoy_Toe_Procedure" },
-        { "distribution": 0.4, "transition": "Decoy_Ray_Procedure" }
+        {
+          "distribution": 0.6,
+          "transition": "Decoy_Toe_Procedure"
+        },
+        {
+          "distribution": 0.4,
+          "transition": "Decoy_Ray_Procedure"
+        }
       ]
     },
     "Decoy_Toe_Procedure": {
       "type": "Procedure",
-      "remarks": ["SNOMED-CT 371186005 -> OMOP 4159766 [vocab query 2026-08-06]. In toe_amputation, NOT in forefoot_midfoot_amputation."],
-      "codes": [
-        { "system": "SNOMED-CT", "code": "371186005", "display": "Amputation of toe [vocab query — OMOP 4159766]" }
+      "remarks": [
+        "SNOMED-CT 371186005 -> OMOP 4159766 [vocab query 2026-08-06]. In toe_amputation, NOT in forefoot_midfoot_amputation."
       ],
-      "duration": { "low": 20, "high": 60, "unit": "minutes" },
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "371186005",
+          "display": "Amputation of toe [vocab query — OMOP 4159766]"
+        }
+      ],
+      "duration": {
+        "low": 20,
+        "high": 60,
+        "unit": "minutes"
+      },
       "direct_transition": "Set_Decoy_Toe_Ray"
     },
     "Decoy_Ray_Procedure": {
@@ -655,16 +868,25 @@
         "the toe and TMA anchors, not a descendant of either."
       ],
       "codes": [
-        { "system": "SNOMED-CT", "code": "405443002", "display": "Ray amputation of foot [vocab query — OMOP 4226945]" }
+        {
+          "system": "SNOMED-CT",
+          "code": "405443002",
+          "display": "Ray amputation of foot [vocab query — OMOP 4226945]"
+        }
       ],
-      "duration": { "low": 30, "high": 75, "unit": "minutes" },
+      "duration": {
+        "low": 30,
+        "high": 75,
+        "unit": "minutes"
+      },
       "direct_transition": "Set_Decoy_Toe_Ray"
     },
     "Set_Decoy_Toe_Ray": {
-      "type": "SetAttribute", "attribute": "amp_decoy_toe_or_ray", "value": true,
+      "type": "SetAttribute",
+      "attribute": "amp_decoy_toe_or_ray",
+      "value": true,
       "direct_transition": "Month_Loop_Check"
     },
-
     "Month_Loop_Check": {
       "type": "Simple",
       "remarks": [
@@ -674,13 +896,21 @@
       ],
       "conditional_transition": [
         {
-          "condition": { "condition_type": "Attribute", "attribute": "amp_month", "operator": "<", "value": 12 },
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "amp_month",
+            "operator": "<",
+            "value": 12
+          },
           "transition": "Month_Tick"
         },
-        { "transition": "Terminal" }
+        {
+          "transition": "Terminal"
+        }
       ]
     },
-
-    "Terminal": { "type": "Terminal" }
+    "Terminal": {
+      "type": "Terminal"
+    }
   }
 }
