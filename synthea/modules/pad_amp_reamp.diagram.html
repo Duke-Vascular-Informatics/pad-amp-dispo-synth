@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pad_amp_reamp — Synthea State Diagram</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 2em auto; max-width: 1500px; padding: 0 1.5em;
+            background: #f5f5f4; color: #27272a; line-height: 1.55; }
+    h1 { color: #18181b; margin-bottom: .2em; }
+    h2 { color: #18181b; margin-top: 1.8em; font-size: 1.15em;
+          border-bottom: 1px solid #d4d4d8; padding-bottom: .3em; }
+    .sub { color: #52525b; margin-top: 0; }
+    .diagram-box { background: #fff; border: 1px solid #d4d4d8; border-radius: 8px;
+                    padding: 1.5em; overflow-x: auto; margin-top: 1em; }
+    ul.legend { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: .4em 1.5em; }
+    ul.legend li { display: flex; align-items: center; font-size: .9em; }
+    .sw { display: inline-block; width: 15px; height: 15px; border-radius: 3px;
+           margin-right: .5em; border: 1px solid rgba(0,0,0,.25); }
+    table { border-collapse: collapse; width: 100%; font-size: .9em; background: #fff; }
+    th, td { border: 1px solid #d4d4d8; padding: .45em .7em; text-align: left; }
+    th { background: #e4e4e7; }
+    code { background: #e4e4e7; padding: .1em .35em; border-radius: 3px; font-size: .9em; }
+    .warn { background: #fef2f2; border-left: 4px solid #b91c1c; padding: .8em 1em;
+             border-radius: 0 4px 4px 0; margin: 1em 0; }
+    footer { margin-top: 3em; font-size: .8em; color: #a1a1aa;
+              border-top: 1px solid #e4e4e7; padding-top: 1em; }
+  </style>
+</head>
+<body>
+  <h1>pad_amp_reamp — state diagram</h1>
+  <p class="sub">Re-amputation and mortality for <code>pad_amp</code> v2 &middot;
+     49 states &middot; generated from
+     <code>pad_amp_reamp.json</code>, not hand-drawn.</p>
+
+  <h2>Legend</h2>
+  <ul class="legend">
+      <li><span class="sw" style="background:#1d4ed8"></span>PUBLISHED target — do not tune</li>
+      <li><span class="sw" style="background:#047857"></span>Real re-amputation signal</li>
+      <li><span class="sw" style="background:#b91c1c"></span>NEGATIVE CONTROL — must NOT be counted</li>
+      <li><span class="sw" style="background:#3f3f46"></span>Death</li>
+      <li><span class="sw" style="background:#fef3c7"></span>Timing window</li>
+      <li><span class="sw" style="background:#7c3aed"></span>Entry guard</li>
+      <li><span class="sw" style="background:#e0f2fe"></span>Routing / branch</li>
+      <li><span class="sw" style="background:#f5f5f4"></span>Attribute (QC handle)</li>
+  </ul>
+
+  <h2>Published targets the diagram must reproduce</h2>
+  <table>
+    <tr><th>Quantity</th><th>MoRe (published)</th><th>pad_amp v1 today</th></tr>
+    <tr><td>ND/NR &middot; ND/R &middot; D/NR &middot; D/R</td>
+        <td>57.7% &middot; 22.9% &middot; 14.3% &middot; 5.1%</td><td>&mdash;</td></tr>
+    <tr><td>Death within 1 year</td><td><b>19.4%</b></td><td>4.0% (8/198)</td></tr>
+    <tr><td>Re-amputation within 1 year</td><td><b>28.0%</b></td><td><b>0%</b></td></tr>
+    <tr><td>Incident level mix TM / TT / TF</td><td>33.8% / 43.7% / 22.5%</td>
+        <td>0% / 59.2% / 40.8%</td></tr>
+  </table>
+  <p class="sub">The four-category split drives the module directly, so the two
+     marginals are exact by construction rather than assumed independent. The level
+     mix belongs to the base module; this one routes on it.</p>
+
+  <div class="warn">
+    <b>The red nodes are the point.</b> MoRe's level and re-amputation logic cannot be
+    expressed in circe, so <code>pad-bka-aka-prog</code> must hand-author its cohort SQL.
+    The negative controls exist so a wrong implementation <i>fails</i> instead of passing:
+    revisions inside the guillotine exclusion window (days 1&ndash;21, with 21/22 as the
+    boundary pair), contralateral amputations, and toe/ray amputations &mdash; the last
+    because <code>minor_amputation</code> contains toe and ray, so SQL built from that
+    broad set rather than <code>forefoot_midfoot_amputation</code> will over-count.
+  </div>
+
+  <h2>Diagram</h2>
+  <div class="diagram-box">
+    <div class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'fontSize':'13px'},'flowchart':{'useMaxWidth':false,'htmlLabels':true,'nodeSpacing':45,'rankSpacing':55}} }%%
+flowchart TD
+  n001["&lt;b&gt;Initial&lt;/b&gt;&lt;br/&gt;[Initial]"]
+  n002["&lt;b&gt;Index Attributes Guard&lt;/b&gt;&lt;br/&gt;[Guard]"]
+  n003["&lt;b&gt;Outcome Assignment&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n004["&lt;b&gt;Set ND NR&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_outcome_4cat = ND_NR"]
+  n005["&lt;b&gt;Set ND R&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_outcome_4cat = ND_R"]
+  n006["&lt;b&gt;Set D NR&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_outcome_4cat = D_NR"]
+  n007["&lt;b&gt;Set D R&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_outcome_4cat = D_R"]
+  n008["&lt;b&gt;Reamp Window Router&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n009["&lt;b&gt;Reamp Delay Definitive 1 365&lt;/b&gt;&lt;br/&gt;[Delay]&lt;br/&gt;delay 1–365 days"]
+  n010["&lt;b&gt;Reamp Delay Guillotine 22 365&lt;/b&gt;&lt;br/&gt;[Delay]&lt;br/&gt;delay 22–365 days"]
+  n011["&lt;b&gt;Reamp Subtype Router&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n012["&lt;b&gt;TM Reamp Subtype&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n013["&lt;b&gt;TT Reamp Subtype&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n014["&lt;b&gt;TF Reamp Subtype&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n015["&lt;b&gt;Reamp Soft Tissue Revision&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 180048002: Revision coverage of amputation stump"]
+  n016["&lt;b&gt;Reamp TM Same Level&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 265739006: Amputation through metatarsal bones"]
+  n017["&lt;b&gt;Reamp TT Same Level&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 88312006: Amputation of leg through tibia and fibula"]
+  n018["&lt;b&gt;Reamp TF Same Level&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 79733001: Amputation above-knee"]
+  n019["&lt;b&gt;Reamp TM To Higher&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n020["&lt;b&gt;Reamp Higher TT&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 88312006: Amputation of leg through tibia and fibula"]
+  n021["&lt;b&gt;Reamp TT To TF&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 79733001: Amputation above-knee"]
+  n022["&lt;b&gt;Reamp Higher TF&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 79733001: Amputation above-knee"]
+  n023["&lt;b&gt;Set Reamp Subtype SoftTissue&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_reamp_subtype = soft_tissue_revision"]
+  n024["&lt;b&gt;Set Reamp Subtype SameLevel&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_reamp_subtype = same_level"]
+  n025["&lt;b&gt;Set Reamp Subtype Higher&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_reamp_subtype = higher_level"]
+  n026["&lt;b&gt;Set Reamp Occurred&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_reamp_occurred = True"]
+  n027["&lt;b&gt;Reamp Laterality Mix&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n028["&lt;b&gt;Set Reamp Lat Ipsilateral&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_reamp_laterality = ipsilateral"]
+  n029["&lt;b&gt;Set Reamp Lat Unknown&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_reamp_laterality = unknown"]
+  n030["&lt;b&gt;Set Reamp Lat Bilateral&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_reamp_laterality = bilateral"]
+  n031["&lt;b&gt;Post Reamp Death Router&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n032["&lt;b&gt;Death After Reamp Delay&lt;/b&gt;&lt;br/&gt;[Delay]&lt;br/&gt;delay 1–120 days"]
+  n033["&lt;b&gt;Death Only Delay&lt;/b&gt;&lt;br/&gt;[Delay]&lt;br/&gt;delay 1–365 days"]
+  n034["&lt;b&gt;Death State&lt;/b&gt;&lt;br/&gt;[Death]"]
+  n035["&lt;b&gt;Set Death 1y&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_death_1y = True"]
+  n036["&lt;b&gt;Reamp Negative Controls&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n037["&lt;b&gt;No Reamp Negative Controls&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n038["&lt;b&gt;Decoy Early Revision Delay&lt;/b&gt;&lt;br/&gt;[Delay]&lt;br/&gt;delay 1–21 days"]
+  n039["&lt;b&gt;Decoy Early Revision Procedure&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 180048002: Revision coverage of amputation stump"]
+  n040["&lt;b&gt;Set Decoy Early&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_decoy_early_revision = True"]
+  n041["&lt;b&gt;Decoy Contralateral Delay&lt;/b&gt;&lt;br/&gt;[Delay]&lt;br/&gt;delay 30–300 days"]
+  n042["&lt;b&gt;Decoy Contralateral Procedure&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 88312006: Amputation of leg through tibia and fibula"]
+  n043["&lt;b&gt;Set Decoy Contralateral&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_decoy_contralateral = True"]
+  n044["&lt;b&gt;Decoy Toe Or Ray Delay&lt;/b&gt;&lt;br/&gt;[Delay]&lt;br/&gt;delay 30–300 days"]
+  n045["&lt;b&gt;Decoy Toe Or Ray Subtype&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n046["&lt;b&gt;Decoy Toe Procedure&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 371186005: Amputation of toe"]
+  n047["&lt;b&gt;Decoy Ray Procedure&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 405443002: Ray amputation of foot"]
+  n048["&lt;b&gt;Set Decoy Toe Ray&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_decoy_toe_or_ray = True"]
+  n049["&lt;b&gt;Terminal&lt;/b&gt;&lt;br/&gt;[Terminal]"]
+  n001 --&gt; n002
+  n002 --&gt; n003
+  n003 -- 57.7% --&gt; n004
+  n003 -- 22.9% --&gt; n005
+  n003 -- 14.3% --&gt; n006
+  n003 -- 5.1% --&gt; n007
+  n004 --&gt; n037
+  n005 --&gt; n008
+  n006 --&gt; n033
+  n007 --&gt; n008
+  n008 -- "amp_index_definitive == false" --&gt; n010
+  n008 -- "else" --&gt; n009
+  n009 --&gt; n011
+  n010 --&gt; n011
+  n011 -- "amp_index_level == TM" --&gt; n012
+  n011 -- "amp_index_level == TT" --&gt; n013
+  n011 -- "else" --&gt; n014
+  n012 -- 55% --&gt; n016
+  n012 -- 45% --&gt; n019
+  n013 -- 30% --&gt; n015
+  n013 -- 35% --&gt; n017
+  n013 -- 35% --&gt; n021
+  n014 -- 45% --&gt; n015
+  n014 -- 55% --&gt; n018
+  n015 --&gt; n023
+  n016 --&gt; n024
+  n017 --&gt; n024
+  n018 --&gt; n024
+  n019 -- 75% --&gt; n020
+  n019 -- 25% --&gt; n022
+  n020 --&gt; n025
+  n021 --&gt; n025
+  n022 --&gt; n025
+  n023 --&gt; n026
+  n024 --&gt; n026
+  n025 --&gt; n026
+  n026 --&gt; n027
+  n027 -- 80% --&gt; n028
+  n027 -- 15% --&gt; n029
+  n027 -- 5% --&gt; n030
+  n028 --&gt; n031
+  n029 --&gt; n031
+  n030 --&gt; n031
+  n031 -- "amp_outcome_4cat == D_R" --&gt; n032
+  n031 -- "else" --&gt; n036
+  n032 --&gt; n034
+  n033 --&gt; n034
+  n034 --&gt; n035
+  n035 --&gt; n049
+  n036 -- 25% --&gt; n041
+  n036 -- 75% --&gt; n049
+  n037 -- 10% --&gt; n038
+  n037 -- 10% --&gt; n041
+  n037 -- 8% --&gt; n044
+  n037 -- 72% --&gt; n049
+  n038 --&gt; n039
+  n039 --&gt; n040
+  n040 --&gt; n049
+  n041 --&gt; n042
+  n042 --&gt; n043
+  n043 --&gt; n049
+  n044 --&gt; n045
+  n045 -- 60% --&gt; n046
+  n045 -- 40% --&gt; n047
+  n046 --&gt; n048
+  n047 --&gt; n048
+  n048 --&gt; n049
+  classDef published fill:#1d4ed8,stroke:#1e3a8a,color:#fff,stroke-width:2px
+  classDef signal fill:#047857,stroke:#065f46,color:#fff
+  classDef decoy fill:#b91c1c,stroke:#7f1d1d,color:#fff
+  classDef death fill:#3f3f46,stroke:#18181b,color:#fff
+  classDef attr fill:#f5f5f4,stroke:#a8a29e,color:#3f3f46
+  classDef delay fill:#fef3c7,stroke:#d97706,color:#78350f
+  classDef guard fill:#7c3aed,stroke:#5b21b6,color:#fff
+  classDef logic fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+  classDef terminalish fill:#fff,stroke:#71717a,color:#3f3f46,stroke-dasharray:3 3
+  class n001,n049 terminalish
+  class n002 guard
+  class n003 published
+  class n004,n005,n006,n007,n023,n024,n025,n026,n028,n029,n030,n035 attr
+  class n008,n011,n012,n013,n014,n019,n027,n036,n037 logic
+  class n009,n010 delay
+  class n015,n016,n017,n018,n020,n021,n022 signal
+  class n031,n032,n033,n034 death
+  class n038,n039,n040,n041,n042,n043,n044,n045,n046,n047,n048 decoy
+    </div>
+  </div>
+
+  <h2>Two things still open</h2>
+  <table>
+    <tr><th>Item</th><th>Detail</th></tr>
+    <tr><td><code>TODO [VOCAB]</code> guillotine</td>
+        <td>No SNOMED guillotine-amputation concept exists. Only CPT4 27882
+            (OMOP 2105448) and 27592 (OMOP 2105211). This module emits CPT4, but the
+            existing module only ever emits SNOMED-CT/RxNorm/LOINC, so CPT4 is
+            unproven through this ETL. If it is dropped, the 22&ndash;365 day window is
+            untestable. Deliberately <i>not</i> substituted with a definitive code.</td></tr>
+    <tr><td><code>TODO [ETL]</code> laterality</td>
+        <td>Synthea has no procedure-laterality field, so the ipsilateral / unknown /
+            bilateral arms and the contralateral decoy are indistinguishable downstream
+            until the ETL populates a modifier or ICD-10-PCS body-part character.</td></tr>
+  </table>
+
+  <footer>
+    Rendered with <a href="https://mermaid.js.org">Mermaid.js</a> (CDN &mdash; needs an
+    internet connection). Regenerate after any module edit so the diagram cannot drift
+    from the JSON.
+  </footer>
+  <script>mermaid.initialize({ startOnLoad: true, maxTextSize: 200000 });</script>
+</body>
+</html>

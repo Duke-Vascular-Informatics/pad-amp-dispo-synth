@@ -1,0 +1,136 @@
+%%{init: {'theme':'base','themeVariables':{'fontSize':'13px'},'flowchart':{'useMaxWidth':false,'htmlLabels':true,'nodeSpacing':45,'rankSpacing':55}} }%%
+flowchart TD
+  n001["<b>Initial</b><br/>[Initial]"]
+  n002["<b>Index Attributes Guard</b><br/>[Guard]"]
+  n003["<b>Outcome Assignment</b><br/>[Simple]"]
+  n004["<b>Set ND NR</b><br/>[SetAttribute]<br/>amp_outcome_4cat = ND_NR"]
+  n005["<b>Set ND R</b><br/>[SetAttribute]<br/>amp_outcome_4cat = ND_R"]
+  n006["<b>Set D NR</b><br/>[SetAttribute]<br/>amp_outcome_4cat = D_NR"]
+  n007["<b>Set D R</b><br/>[SetAttribute]<br/>amp_outcome_4cat = D_R"]
+  n008["<b>Reamp Window Router</b><br/>[Simple]"]
+  n009["<b>Reamp Delay Definitive 1 365</b><br/>[Delay]<br/>delay 1–365 days"]
+  n010["<b>Reamp Delay Guillotine 22 365</b><br/>[Delay]<br/>delay 22–365 days"]
+  n011["<b>Reamp Subtype Router</b><br/>[Simple]"]
+  n012["<b>TM Reamp Subtype</b><br/>[Simple]"]
+  n013["<b>TT Reamp Subtype</b><br/>[Simple]"]
+  n014["<b>TF Reamp Subtype</b><br/>[Simple]"]
+  n015["<b>Reamp Soft Tissue Revision</b><br/>[Procedure]<br/>SNOMED-CT 180048002: Revision coverage of amputation stump"]
+  n016["<b>Reamp TM Same Level</b><br/>[Procedure]<br/>SNOMED-CT 265739006: Amputation through metatarsal bones"]
+  n017["<b>Reamp TT Same Level</b><br/>[Procedure]<br/>SNOMED-CT 88312006: Amputation of leg through tibia and fibula"]
+  n018["<b>Reamp TF Same Level</b><br/>[Procedure]<br/>SNOMED-CT 79733001: Amputation above-knee"]
+  n019["<b>Reamp TM To Higher</b><br/>[Simple]"]
+  n020["<b>Reamp Higher TT</b><br/>[Procedure]<br/>SNOMED-CT 88312006: Amputation of leg through tibia and fibula"]
+  n021["<b>Reamp TT To TF</b><br/>[Procedure]<br/>SNOMED-CT 79733001: Amputation above-knee"]
+  n022["<b>Reamp Higher TF</b><br/>[Procedure]<br/>SNOMED-CT 79733001: Amputation above-knee"]
+  n023["<b>Set Reamp Subtype SoftTissue</b><br/>[SetAttribute]<br/>amp_reamp_subtype = soft_tissue_revision"]
+  n024["<b>Set Reamp Subtype SameLevel</b><br/>[SetAttribute]<br/>amp_reamp_subtype = same_level"]
+  n025["<b>Set Reamp Subtype Higher</b><br/>[SetAttribute]<br/>amp_reamp_subtype = higher_level"]
+  n026["<b>Set Reamp Occurred</b><br/>[SetAttribute]<br/>amp_reamp_occurred = True"]
+  n027["<b>Reamp Laterality Mix</b><br/>[Simple]"]
+  n028["<b>Set Reamp Lat Ipsilateral</b><br/>[SetAttribute]<br/>amp_reamp_laterality = ipsilateral"]
+  n029["<b>Set Reamp Lat Unknown</b><br/>[SetAttribute]<br/>amp_reamp_laterality = unknown"]
+  n030["<b>Set Reamp Lat Bilateral</b><br/>[SetAttribute]<br/>amp_reamp_laterality = bilateral"]
+  n031["<b>Post Reamp Death Router</b><br/>[Simple]"]
+  n032["<b>Death After Reamp Delay</b><br/>[Delay]<br/>delay 1–120 days"]
+  n033["<b>Death Only Delay</b><br/>[Delay]<br/>delay 1–365 days"]
+  n034["<b>Death State</b><br/>[Death]"]
+  n035["<b>Set Death 1y</b><br/>[SetAttribute]<br/>amp_death_1y = True"]
+  n036["<b>Reamp Negative Controls</b><br/>[Simple]"]
+  n037["<b>No Reamp Negative Controls</b><br/>[Simple]"]
+  n038["<b>Decoy Early Revision Delay</b><br/>[Delay]<br/>delay 1–21 days"]
+  n039["<b>Decoy Early Revision Procedure</b><br/>[Procedure]<br/>SNOMED-CT 180048002: Revision coverage of amputation stump"]
+  n040["<b>Set Decoy Early</b><br/>[SetAttribute]<br/>amp_decoy_early_revision = True"]
+  n041["<b>Decoy Contralateral Delay</b><br/>[Delay]<br/>delay 30–300 days"]
+  n042["<b>Decoy Contralateral Procedure</b><br/>[Procedure]<br/>SNOMED-CT 88312006: Amputation of leg through tibia and fibula"]
+  n043["<b>Set Decoy Contralateral</b><br/>[SetAttribute]<br/>amp_decoy_contralateral = True"]
+  n044["<b>Decoy Toe Or Ray Delay</b><br/>[Delay]<br/>delay 30–300 days"]
+  n045["<b>Decoy Toe Or Ray Subtype</b><br/>[Simple]"]
+  n046["<b>Decoy Toe Procedure</b><br/>[Procedure]<br/>SNOMED-CT 371186005: Amputation of toe"]
+  n047["<b>Decoy Ray Procedure</b><br/>[Procedure]<br/>SNOMED-CT 405443002: Ray amputation of foot"]
+  n048["<b>Set Decoy Toe Ray</b><br/>[SetAttribute]<br/>amp_decoy_toe_or_ray = True"]
+  n049["<b>Terminal</b><br/>[Terminal]"]
+  n001 --> n002
+  n002 --> n003
+  n003 -- 57.7% --> n004
+  n003 -- 22.9% --> n005
+  n003 -- 14.3% --> n006
+  n003 -- 5.1% --> n007
+  n004 --> n037
+  n005 --> n008
+  n006 --> n033
+  n007 --> n008
+  n008 -- "amp_index_definitive == false" --> n010
+  n008 -- "else" --> n009
+  n009 --> n011
+  n010 --> n011
+  n011 -- "amp_index_level == TM" --> n012
+  n011 -- "amp_index_level == TT" --> n013
+  n011 -- "else" --> n014
+  n012 -- 55% --> n016
+  n012 -- 45% --> n019
+  n013 -- 30% --> n015
+  n013 -- 35% --> n017
+  n013 -- 35% --> n021
+  n014 -- 45% --> n015
+  n014 -- 55% --> n018
+  n015 --> n023
+  n016 --> n024
+  n017 --> n024
+  n018 --> n024
+  n019 -- 75% --> n020
+  n019 -- 25% --> n022
+  n020 --> n025
+  n021 --> n025
+  n022 --> n025
+  n023 --> n026
+  n024 --> n026
+  n025 --> n026
+  n026 --> n027
+  n027 -- 80% --> n028
+  n027 -- 15% --> n029
+  n027 -- 5% --> n030
+  n028 --> n031
+  n029 --> n031
+  n030 --> n031
+  n031 -- "amp_outcome_4cat == D_R" --> n032
+  n031 -- "else" --> n036
+  n032 --> n034
+  n033 --> n034
+  n034 --> n035
+  n035 --> n049
+  n036 -- 25% --> n041
+  n036 -- 75% --> n049
+  n037 -- 10% --> n038
+  n037 -- 10% --> n041
+  n037 -- 8% --> n044
+  n037 -- 72% --> n049
+  n038 --> n039
+  n039 --> n040
+  n040 --> n049
+  n041 --> n042
+  n042 --> n043
+  n043 --> n049
+  n044 --> n045
+  n045 -- 60% --> n046
+  n045 -- 40% --> n047
+  n046 --> n048
+  n047 --> n048
+  n048 --> n049
+  classDef published fill:#1d4ed8,stroke:#1e3a8a,color:#fff,stroke-width:2px
+  classDef signal fill:#047857,stroke:#065f46,color:#fff
+  classDef decoy fill:#b91c1c,stroke:#7f1d1d,color:#fff
+  classDef death fill:#3f3f46,stroke:#18181b,color:#fff
+  classDef attr fill:#f5f5f4,stroke:#a8a29e,color:#3f3f46
+  classDef delay fill:#fef3c7,stroke:#d97706,color:#78350f
+  classDef guard fill:#7c3aed,stroke:#5b21b6,color:#fff
+  classDef logic fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+  classDef terminalish fill:#fff,stroke:#71717a,color:#3f3f46,stroke-dasharray:3 3
+  class n001,n049 terminalish
+  class n002 guard
+  class n003 published
+  class n004,n005,n006,n007,n023,n024,n025,n026,n028,n029,n030,n035 attr
+  class n008,n011,n012,n013,n014,n019,n027,n036,n037 logic
+  class n009,n010 delay
+  class n015,n016,n017,n018,n020,n021,n022 signal
+  class n031,n032,n033,n034 death
+  class n038,n039,n040,n041,n042,n043,n044,n045,n046,n047,n048 decoy
