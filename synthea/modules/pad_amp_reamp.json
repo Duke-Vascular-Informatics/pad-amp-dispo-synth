@@ -94,7 +94,7 @@
     "pre-flight can assert an exact expected count rather than eyeball a total.",
     "If the pre-flight passes whether the SQL is right or wrong, the dataset failed.",
     "",
-    "  (amp_decoy_early_revision has MOVED to the base module — see below.)",
+    "  (the early-second-code control lives in the base module as amp_second_code_early — renamed from amp_decoy_early_revision 2026-08-06 when the guillotine was dropped; it is now an AMBIGUOUS case, not a decoy.)",
     "  amp_decoy_contralateral   correct timing, correct level, WRONG LIMB.",
     "  amp_decoy_toe_or_ray      never an incident level and never 'same or higher'",
     "                            than TM/TT/TF. Matters because the workspace's",

@@ -27,7 +27,68 @@
     "patients should show a longer LOS.",
     "",
     "===========================================================================",
-    "WHY THIS EXISTS: THE CLOSURE DEFINES THE INDEX LEVEL",
+    "DESIGN: A TEMPORAL GATE, NOT MoRe's CODE-KEYED RULE",
+    "===========================================================================",
+    "REVISED 2026-08-06 after the CPT4 ETL check came back negative (see below).",
+    "Every index is now a DEFINITIVE SNOMED code. What varies is whether a SECOND",
+    "amputation code follows, and how long after:",
+    "",
+    "    single code                     ~86.7% of patients",
+    "    second code, days 1-21          ~11.3%   AMBIGUOUS — see below",
+    "    second code, days 22-42          ~1.3%   unambiguously a re-amputation",
+    "",
+    "MoRe keys its 22-365 day window on the presence of a GUILLOTINE CODE. That code",
+    "is CPT4-only and cannot reach this CDM, so there is no signal to select the",
+    "window and the 1-365 rule applies to everyone. The analysis therefore uses a",
+    "TEMPORAL GATE — a second amputation code close to the first is treated as part",
+    "of the index event — which handles the same clinical reality by a different",
+    "route.",
+    "",
+    "⚠️ THIS IS AN ITEM-16 DEVIATION FROM MoRe, and it is MEASURABLE rather than",
+    "merely declarable. The two approaches disagree on exactly one pattern: two",
+    "amputation codes 1-21 days apart. In the CDM that pattern is indistinguishable",
+    "between",
+    "     (i)  a STAGED amputation — the second code completes the index event, and",
+    "     (ii) a genuine EARLY RE-AMPUTATION — the second code is an outcome.",
+    "The temporal gate absorbs both into the index; MoRe's literal 1-365 rule counts",
+    "both as re-amputations. amp_second_code_early flags every such patient, so QC",
+    "reports the disagreement as a NUMBER (~11.3% of the cohort here) instead of an",
+    "unquantified caveat.",
+    "",
+    "The second code still CLASSIFIES THE LEVEL when it is early — MoRe's principle",
+    "that the completing procedure determines the incident level survives the change.",
+    "~12.5% of early second codes escalate TT -> TF.",
+    "",
+    "===========================================================================",
+    "⚠️ TODO [MANUAL REVIEW] — EDGE CASES AT THE CUT POINT",
+    "===========================================================================",
+    "A DATE THRESHOLD IS NOT A CLINICAL BOUNDARY. Whatever cut point the cohort SQL",
+    "uses (21/22 days here), patients whose second code lands within a few days of it",
+    "will be assigned by arithmetic, and some of those assignments will be clinically",
+    "wrong in both directions:",
+    "",
+    "  * a staged closure delayed to day 24 by theatre availability, ICU stay or a",
+    "    weekend — counted as a re-amputation, but clinically part of the index;",
+    "  * a genuine early failure re-amputated on day 19 — absorbed into the index,",
+    "    but clinically an outcome.",
+    "",
+    "REQUIRED BEFORE ANY RESULTS ARE REPORTED: pull every patient whose second",
+    "amputation code falls in a band around the cut point — days 15-28 is a",
+    "reasonable start — and adjudicate them by hand against the clinical narrative.",
+    "Report how many were mis-assigned by the date rule, and in which direction.",
+    "",
+    "The synthetic data supports this directly: amp_index_closure_branch and the",
+    "second-code delay ranges (1-21 and 22-42) mean the boundary band is populated on",
+    "BOTH sides by construction, and ground truth is known for every patient, so the",
+    "review procedure itself can be rehearsed here before it is run on Duke data.",
+    "",
+    "  QC query to drive the review (synthetic; adapt for Duke):",
+    "    SELECT person_id, procedure_date,",
+    "           DATEDIFF(day, first_amp_date, procedure_date) AS days_from_index",
+    "    FROM   <second amputation codes>",
+    "    WHERE  DATEDIFF(day, first_amp_date, procedure_date) BETWEEN 15 AND 28",
+    "    ORDER  BY days_from_index;",
+    "",
     "===========================================================================",
     "MoRe, Methods, 'Defining incident amputation level', verbatim:",
     "",
@@ -288,7 +349,12 @@
       "type": "SetAttribute",
       "attribute": "amp_index_definitive",
       "value": true,
-      "direct_transition": "Set_Not_Guillotine"
+      "direct_transition": "Set_Second_Code_Branch_None",
+      "remarks": [
+        "TM index: always a single definitive code, no second-code arm. MoRe's staged/",
+        "guillotine rule applied only at TT and TF, so keeping TM single-code preserves",
+        "both that fidelity and the level-mix arithmetic."
+      ]
     },
     "Set_Level_TT_Initial": {
       "type": "SetAttribute",
@@ -297,23 +363,7 @@
       ],
       "attribute": "amp_index_level",
       "value": "TT",
-      "direct_transition": "TT_Guillotine_Split"
-    },
-    "TT_Guillotine_Split": {
-      "type": "Simple",
-      "remarks": [
-        "P(guillotine | TT) = 0.20. RESEARCHER_ADJUSTS — not published; drives the whole two-window test."
-      ],
-      "distributed_transition": [
-        {
-          "distribution": 0.2,
-          "transition": "Index_Procedure_TT_Guillotine"
-        },
-        {
-          "distribution": 0.8,
-          "transition": "Index_Procedure_TT_Definitive"
-        }
-      ]
+      "direct_transition": "TT_Second_Code_Branch"
     },
     "Index_Procedure_TT_Definitive": {
       "type": "Procedure",
@@ -338,29 +388,13 @@
       "type": "SetAttribute",
       "attribute": "amp_index_definitive",
       "value": true,
-      "direct_transition": "Set_Not_Guillotine"
+      "direct_transition": "Set_Second_Code_Branch_None"
     },
     "Set_Level_TF_Initial": {
       "type": "SetAttribute",
       "attribute": "amp_index_level",
       "value": "TF",
-      "direct_transition": "TF_Guillotine_Split"
-    },
-    "TF_Guillotine_Split": {
-      "type": "Simple",
-      "remarks": [
-        "P(guillotine | TF) = 0.20. RESEARCHER_ADJUSTS."
-      ],
-      "distributed_transition": [
-        {
-          "distribution": 0.2,
-          "transition": "Index_Procedure_TF_Guillotine"
-        },
-        {
-          "distribution": 0.8,
-          "transition": "Index_Procedure_TF_Definitive"
-        }
-      ]
+      "direct_transition": "TF_Second_Code_Branch"
     },
     "Index_Procedure_TF_Definitive": {
       "type": "Procedure",
@@ -385,332 +419,52 @@
       "type": "SetAttribute",
       "attribute": "amp_index_definitive",
       "value": true,
-      "direct_transition": "Set_Not_Guillotine"
-    },
-    "Set_Not_Guillotine": {
-      "type": "SetAttribute",
-      "attribute": "amp_index_guillotine",
-      "value": false,
-      "direct_transition": "Index_Sequence_Complete"
-    },
-    "Index_Procedure_TT_Guillotine": {
-      "type": "Procedure",
-      "remarks": [
-        "⛔ CPT4, NOT SNOMED — see TODO [VOCAB] in the header. There is no SNOMED",
-        "guillotine-amputation concept in this vocabulary build.",
-        "CPT4 27882 -> OMOP 2105448, standard, Procedure domain [vocab query 2026-08-06].",
-        "If the ETL drops CPT4 this state produces nothing and every downstream",
-        "guillotine test silently passes on absent data."
-      ],
-      "codes": [
-        {
-          "system": "CPT4",
-          "code": "27882",
-          "display": "Amputation, leg, through tibia and fibula; open, circular (guillotine) [vocab query — OMOP 2105448]"
-        }
-      ],
-      "duration": {
-        "low": 45,
-        "high": 105,
-        "unit": "minutes"
-      },
-      "direct_transition": "Set_Is_Guillotine_TT"
-    },
-    "Set_Is_Guillotine_TT": {
-      "type": "SetAttribute",
-      "attribute": "amp_index_guillotine",
-      "value": true,
-      "direct_transition": "TT_Closure_Branch"
-    },
-    "Index_Procedure_TF_Guillotine": {
-      "type": "Procedure",
-      "remarks": [
-        "⛔ CPT4, NOT SNOMED — see TODO [VOCAB]. CPT4 27592 -> OMOP 2105211,",
-        "standard [vocab query 2026-08-06]."
-      ],
-      "codes": [
-        {
-          "system": "CPT4",
-          "code": "27592",
-          "display": "Amputation, thigh, through femur, any level; open, circular (guillotine) [vocab query — OMOP 2105211]"
-        }
-      ],
-      "duration": {
-        "low": 60,
-        "high": 130,
-        "unit": "minutes"
-      },
-      "direct_transition": "Set_Is_Guillotine_TF"
-    },
-    "Set_Is_Guillotine_TF": {
-      "type": "SetAttribute",
-      "attribute": "amp_index_guillotine",
-      "value": true,
-      "direct_transition": "TF_Closure_Branch"
-    },
-    "TT_Closure_Branch": {
-      "type": "Simple",
-      "remarks": [
-        "The three branches MoRe requires. 85/10/5 is RESEARCHER_ADJUSTS — MoRe",
-        "implies (a) is the norm and treats (b)/(c) as coding errors, but publishes",
-        "no frequencies."
-      ],
-      "distributed_transition": [
-        {
-          "distribution": 0.85,
-          "transition": "TT_Closure_Within_3wk_Delay"
-        },
-        {
-          "distribution": 0.1,
-          "transition": "TT_Closure_Late_Delay"
-        },
-        {
-          "distribution": 0.05,
-          "transition": "Set_Closure_Branch_None"
-        }
-      ]
-    },
-    "TT_Closure_Within_3wk_Delay": {
-      "type": "Delay",
-      "remarks": [
-        "Days 1-21 — inside MoRe's three-week search by construction. Day 21 is the",
-        "boundary that must NOT count as a re-amputation, against day 22 which must.",
-        "This is the 1-2 week second-BKA-code pattern seen in real claims."
-      ],
-      "range": {
-        "low": 1,
-        "high": 21,
-        "unit": "days"
-      },
-      "direct_transition": "TT_Closure_Escalation_Split"
-    },
-    "TT_Closure_Escalation_Split": {
-      "type": "Simple",
-      "remarks": [
-        "The closure CLASSIFIES the level. ~12.5% are closed higher than the",
-        "guillotine (TT -> TF) — a guillotine implies marginal tissue viability.",
-        "RESEARCHER_ADJUSTS, and the Index_Level_Draw shares above must be re-solved",
-        "if this changes."
-      ],
-      "distributed_transition": [
-        {
-          "distribution": 0.875,
-          "transition": "Closure_Procedure_TT"
-        },
-        {
-          "distribution": 0.125,
-          "transition": "Closure_Procedure_TF_Escalated"
-        }
-      ]
-    },
-    "Closure_Procedure_TT": {
-      "type": "Procedure",
-      "remarks": [
-        "⭐ THE STRONGEST NEGATIVE CONTROL. A SECOND definitive TT code 1-21 days",
-        "after the guillotine — identical to the index code, distinguished ONLY by",
-        "date. Part of the INDEX EVENT; must NOT count as a re-amputation."
-      ],
-      "codes": [
-        {
-          "system": "SNOMED-CT",
-          "code": "88312006",
-          "display": "Amputation of leg through tibia and fibula [vocab query — OMOP 4338257]"
-        }
-      ],
-      "duration": {
-        "low": 60,
-        "high": 150,
-        "unit": "minutes"
-      },
-      "direct_transition": "Set_Level_TT_Confirmed"
+      "direct_transition": "Set_Second_Code_Branch_None"
     },
     "Set_Level_TT_Confirmed": {
       "type": "SetAttribute",
       "attribute": "amp_index_level",
       "value": "TT",
-      "direct_transition": "Set_Definitive_False_Closed"
-    },
-    "Closure_Procedure_TF_Escalated": {
-      "type": "Procedure",
-      "remarks": [
-        "ESCALATED at closure — guillotine was TT, closure is TF, so per MoRe the",
-        "INCIDENT LEVEL IS TF. A SQL that takes the level from the guillotine code",
-        "rather than the closure will mis-level exactly these patients."
-      ],
-      "codes": [
-        {
-          "system": "SNOMED-CT",
-          "code": "79733001",
-          "display": "Amputation above-knee [vocab query — OMOP 4195136]"
-        }
-      ],
-      "duration": {
-        "low": 120,
-        "high": 210,
-        "unit": "minutes"
-      },
-      "direct_transition": "Set_Level_TF_Escalated"
+      "direct_transition": "Set_Definitive_True_Staged"
     },
     "Set_Level_TF_Escalated": {
       "type": "SetAttribute",
       "attribute": "amp_index_level",
       "value": "TF",
-      "direct_transition": "Set_Definitive_False_Closed"
-    },
-    "TF_Closure_Branch": {
-      "type": "Simple",
-      "remarks": [
-        "Same three branches. No escalation arm — TF has nowhere higher within MoRe's levels."
-      ],
-      "distributed_transition": [
-        {
-          "distribution": 0.85,
-          "transition": "TF_Closure_Within_3wk_Delay"
-        },
-        {
-          "distribution": 0.1,
-          "transition": "TF_Closure_Late_Delay"
-        },
-        {
-          "distribution": 0.05,
-          "transition": "Set_Closure_Branch_None"
-        }
-      ]
-    },
-    "TF_Closure_Within_3wk_Delay": {
-      "type": "Delay",
-      "range": {
-        "low": 1,
-        "high": 21,
-        "unit": "days"
-      },
-      "direct_transition": "Closure_Procedure_TF"
-    },
-    "Closure_Procedure_TF": {
-      "type": "Procedure",
-      "remarks": [
-        "Second definitive TF code, days 1-21. Negative control, as Closure_Procedure_TT."
-      ],
-      "codes": [
-        {
-          "system": "SNOMED-CT",
-          "code": "79733001",
-          "display": "Amputation above-knee [vocab query — OMOP 4195136]"
-        }
-      ],
-      "duration": {
-        "low": 90,
-        "high": 180,
-        "unit": "minutes"
-      },
-      "direct_transition": "Set_Level_TF_Confirmed"
+      "direct_transition": "Set_Definitive_True_Staged"
     },
     "Set_Level_TF_Confirmed": {
       "type": "SetAttribute",
       "attribute": "amp_index_level",
       "value": "TF",
-      "direct_transition": "Set_Definitive_False_Closed"
+      "direct_transition": "Set_Definitive_True_Staged"
     },
-    "Set_Definitive_False_Closed": {
+    "Set_Level_From_First_Code_TT": {
       "type": "SetAttribute",
       "remarks": [
-        "definitive = FALSE. This is what makes pad_amp_reamp apply MoRe's 22-365",
-        "day window to these patients instead of 1-365."
-      ],
-      "attribute": "amp_index_definitive",
-      "value": false,
-      "direct_transition": "Set_Decoy_Early_Revision"
-    },
-    "Set_Decoy_Early_Revision": {
-      "type": "SetAttribute",
-      "remarks": [
-        "Ground truth: the closure must NOT be counted as a re-amputation. QC asserts an exact count."
-      ],
-      "attribute": "amp_decoy_early_revision",
-      "value": true,
-      "direct_transition": "Set_Closure_Branch_Within"
-    },
-    "Set_Closure_Branch_Within": {
-      "type": "SetAttribute",
-      "attribute": "amp_index_closure_branch",
-      "value": "within_3wk",
-      "direct_transition": "Index_Sequence_Complete"
-    },
-    "TT_Closure_Late_Delay": {
-      "type": "Delay",
-      "remarks": [
-        "Branch (b), days 22-42. MoRe: 'an error in the initial coding was presumed",
-        "and the guillotine code was recoded as a definitive amputation.'",
-        "⭐ THE SHARPEST TEST IN THE DATASET: the SAME code at day 20 is part of the",
-        "index event, at day 25 it is an outcome. Nothing else tests that."
-      ],
-      "range": {
-        "low": 22,
-        "high": 42,
-        "unit": "days"
-      },
-      "direct_transition": "Closure_Procedure_TT_Late"
-    },
-    "Closure_Procedure_TT_Late": {
-      "type": "Procedure",
-      "codes": [
-        {
-          "system": "SNOMED-CT",
-          "code": "88312006",
-          "display": "Amputation of leg through tibia and fibula [vocab query — OMOP 4338257]"
-        }
-      ],
-      "duration": {
-        "low": 60,
-        "high": 150,
-        "unit": "minutes"
-      },
-      "direct_transition": "Set_Level_From_Guillotine_TT"
-    },
-    "Set_Level_From_Guillotine_TT": {
-      "type": "SetAttribute",
-      "remarks": [
-        "Level comes from the GUILLOTINE, not the late closure — the guillotine was recoded as the definitive index."
+        "Level comes from the FIRST code. A second code 22-42 days out is an outcome,",
+        "not part of the index, so it does not reclassify the level."
       ],
       "attribute": "amp_index_level",
       "value": "TT",
       "direct_transition": "Set_Definitive_True_Recoded"
     },
-    "TF_Closure_Late_Delay": {
-      "type": "Delay",
-      "range": {
-        "low": 22,
-        "high": 42,
-        "unit": "days"
-      },
-      "direct_transition": "Closure_Procedure_TF_Late"
-    },
-    "Closure_Procedure_TF_Late": {
-      "type": "Procedure",
-      "codes": [
-        {
-          "system": "SNOMED-CT",
-          "code": "79733001",
-          "display": "Amputation above-knee [vocab query — OMOP 4195136]"
-        }
-      ],
-      "duration": {
-        "low": 90,
-        "high": 180,
-        "unit": "minutes"
-      },
-      "direct_transition": "Set_Level_From_Guillotine_TF"
-    },
-    "Set_Level_From_Guillotine_TF": {
+    "Set_Level_From_First_Code_TF": {
       "type": "SetAttribute",
       "attribute": "amp_index_level",
       "value": "TF",
-      "direct_transition": "Set_Definitive_True_Recoded"
+      "direct_transition": "Set_Definitive_True_Recoded",
+      "remarks": [
+        "Level comes from the FIRST code. A second code 22-42 days out is an outcome,",
+        "not part of the index, so it does not reclassify the level."
+      ]
     },
     "Set_Definitive_True_Recoded": {
       "type": "SetAttribute",
       "remarks": [
-        "Guillotine recoded as definitive -> the 1-365 day window applies, so the late closure IS eligible."
+        "definitive = true, as for every index now. The late second code is unambiguously",
+        "a re-amputation under BOTH the temporal gate and MoRe's literal rule — which is",
+        "why this arm is the clean positive control and the 1-21 day arm is not."
       ],
       "attribute": "amp_index_definitive",
       "value": true,
@@ -734,32 +488,7 @@
       "type": "SetAttribute",
       "attribute": "amp_reamp_subtype",
       "value": "same_level",
-      "direct_transition": "Set_Closure_Branch_Late"
-    },
-    "Set_Closure_Branch_Late": {
-      "type": "SetAttribute",
-      "attribute": "amp_index_closure_branch",
-      "value": "late",
-      "direct_transition": "Index_Sequence_Complete"
-    },
-    "Set_Closure_Branch_None": {
-      "type": "SetAttribute",
-      "remarks": [
-        "Branch (c). No closure ever appears, so the guillotine is recoded as the",
-        "definitive index at its own level — which the provisional Set_Level_*_Initial",
-        "already holds, so only definitive needs setting.",
-        "MoRe states this branch; ref 10 states only the >3-week one, so an",
-        "implementation following ref 10 misses it entirely."
-      ],
-      "attribute": "amp_index_closure_branch",
-      "value": "none",
-      "direct_transition": "Set_Definitive_True_No_Closure"
-    },
-    "Set_Definitive_True_No_Closure": {
-      "type": "SetAttribute",
-      "attribute": "amp_index_definitive",
-      "value": true,
-      "direct_transition": "Index_Sequence_Complete"
+      "direct_transition": "Set_Second_Code_Branch_Late"
     },
     "Index_Sequence_Complete": {
       "type": "Simple",
@@ -771,6 +500,335 @@
     },
     "Terminal": {
       "type": "Terminal"
+    },
+    "Index_Procedure_TT_Staged_Within_3wk": {
+      "type": "Procedure",
+      "remarks": [
+        "Index TT — the FIRST of two codes. SNOMED-CT 88312006 -> OMOP 4338257 [vocab query 2026-08-06]."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "88312006",
+          "display": "Amputation of leg through tibia and fibula [vocab query — OMOP 4338257]"
+        }
+      ],
+      "duration": {
+        "low": 90,
+        "high": 180,
+        "unit": "minutes"
+      },
+      "direct_transition": "TT_Second_Code_Early_Delay"
+    },
+    "Index_Procedure_TT_Staged_Late": {
+      "type": "Procedure",
+      "remarks": [
+        "Index TT — the FIRST of two codes. SNOMED-CT 88312006 -> OMOP 4338257 [vocab query 2026-08-06]."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "88312006",
+          "display": "Amputation of leg through tibia and fibula [vocab query — OMOP 4338257]"
+        }
+      ],
+      "duration": {
+        "low": 90,
+        "high": 180,
+        "unit": "minutes"
+      },
+      "direct_transition": "TT_Second_Code_Late_Delay"
+    },
+    "Index_Procedure_TF_Staged_Within_3wk": {
+      "type": "Procedure",
+      "remarks": [
+        "Index TF — the FIRST of two codes. SNOMED-CT 79733001 -> OMOP 4195136 [vocab query 2026-08-06]."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "79733001",
+          "display": "Amputation above-knee [vocab query — OMOP 4195136]"
+        }
+      ],
+      "duration": {
+        "low": 120,
+        "high": 210,
+        "unit": "minutes"
+      },
+      "direct_transition": "TF_Second_Code_Early_Delay"
+    },
+    "Index_Procedure_TF_Staged_Late": {
+      "type": "Procedure",
+      "remarks": [
+        "Index TF — the FIRST of two codes. SNOMED-CT 79733001 -> OMOP 4195136 [vocab query 2026-08-06]."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "79733001",
+          "display": "Amputation above-knee [vocab query — OMOP 4195136]"
+        }
+      ],
+      "duration": {
+        "low": 120,
+        "high": 210,
+        "unit": "minutes"
+      },
+      "direct_transition": "TF_Second_Code_Late_Delay"
+    },
+    "Set_Second_Code_Early": {
+      "type": "SetAttribute",
+      "remarks": [
+        "⭐ THE AMBIGUOUS CASE, and the whole reason this arm exists. Two amputation codes",
+        "1-21 days apart are INDISTINGUISHABLE in the CDM between:",
+        "   (i)  a staged amputation — the second code completes the index event, or",
+        "   (ii) a genuine early re-amputation — the second code is an outcome.",
+        "A temporal gate absorbs these into the index; MoRe's literal 1-365 rule counts",
+        "them. QC reports this count as the MEASURED divergence between the two approaches.",
+        "⚠️ MANUAL REVIEW REQUIRED — see the note in the module header."
+      ],
+      "attribute": "amp_second_code_early",
+      "value": true,
+      "direct_transition": "Set_Second_Code_Branch_Early"
+    },
+    "TT_Second_Code_Branch": {
+      "type": "Simple",
+      "remarks": [
+        "STAGED-AMPUTATION PATTERN. Replaces the guillotine split 2026-08-06 after the",
+        "ETL check showed CPT4 cannot reach the CDM. Every index is now a DEFINITIVE",
+        "SNOMED code; what varies is whether a SECOND amputation code follows, and when.",
+        "",
+        "0.17 = 0.20 x 0.85 (previously P(guillotine|TT) x P(closure within 3wk)) and",
+        "0.02 = 0.20 x 0.10, so the emitted event pattern is UNCHANGED from the",
+        "guillotine version. Only the index CODE changed, from CPT4 to SNOMED. The",
+        "escalation leak stays 0.02125 and Index_Level_Draw needs no re-solve."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.17,
+          "transition": "Index_Procedure_TT_Staged_Within_3wk"
+        },
+        {
+          "distribution": 0.02,
+          "transition": "Index_Procedure_TT_Staged_Late"
+        },
+        {
+          "distribution": 0.81,
+          "transition": "Index_Procedure_TT_Definitive"
+        }
+      ]
+    },
+    "TF_Second_Code_Branch": {
+      "type": "Simple",
+      "remarks": [
+        "As TT. No escalation arm — TF has nowhere higher within MoRe's levels."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.17,
+          "transition": "Index_Procedure_TF_Staged_Within_3wk"
+        },
+        {
+          "distribution": 0.02,
+          "transition": "Index_Procedure_TF_Staged_Late"
+        },
+        {
+          "distribution": 0.81,
+          "transition": "Index_Procedure_TF_Definitive"
+        }
+      ]
+    },
+    "TT_Second_Code_Early_Delay": {
+      "type": "Delay",
+      "remarks": [
+        "Days 1-21 — inside MoRe's three-week search by construction. Day 21 is the",
+        "boundary that must NOT count as a re-amputation, against day 22 which must.",
+        "This is the 1-2 week second-BKA-code pattern seen in real claims."
+      ],
+      "range": {
+        "low": 1,
+        "high": 21,
+        "unit": "days"
+      },
+      "direct_transition": "TT_Second_Code_Escalation_Split"
+    },
+    "TF_Second_Code_Early_Delay": {
+      "type": "Delay",
+      "range": {
+        "low": 1,
+        "high": 21,
+        "unit": "days"
+      },
+      "direct_transition": "Second_Code_TF"
+    },
+    "TT_Second_Code_Late_Delay": {
+      "type": "Delay",
+      "remarks": [
+        "Branch (b), days 22-42. MoRe: 'an error in the initial coding was presumed",
+        "and the guillotine code was recoded as a definitive amputation.'",
+        "⭐ THE SHARPEST TEST IN THE DATASET: the SAME code at day 20 is part of the",
+        "index event, at day 25 it is an outcome. Nothing else tests that."
+      ],
+      "range": {
+        "low": 22,
+        "high": 42,
+        "unit": "days"
+      },
+      "direct_transition": "Second_Code_TT_Late"
+    },
+    "TF_Second_Code_Late_Delay": {
+      "type": "Delay",
+      "range": {
+        "low": 22,
+        "high": 42,
+        "unit": "days"
+      },
+      "direct_transition": "Second_Code_TF_Late"
+    },
+    "TT_Second_Code_Escalation_Split": {
+      "type": "Simple",
+      "remarks": [
+        "The closure CLASSIFIES the level. ~12.5% are closed higher than the",
+        "guillotine (TT -> TF) — a guillotine implies marginal tissue viability.",
+        "RESEARCHER_ADJUSTS, and the Index_Level_Draw shares above must be re-solved",
+        "if this changes."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.875,
+          "transition": "Second_Code_TT"
+        },
+        {
+          "distribution": 0.125,
+          "transition": "Second_Code_TF_Escalated"
+        }
+      ]
+    },
+    "Second_Code_TT": {
+      "type": "Procedure",
+      "remarks": [
+        "⭐ THE STRONGEST NEGATIVE CONTROL. A SECOND definitive TT code 1-21 days",
+        "after the guillotine — identical to the index code, distinguished ONLY by",
+        "date. Part of the INDEX EVENT; must NOT count as a re-amputation."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "88312006",
+          "display": "Amputation of leg through tibia and fibula [vocab query — OMOP 4338257]"
+        }
+      ],
+      "duration": {
+        "low": 60,
+        "high": 150,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Level_TT_Confirmed"
+    },
+    "Second_Code_TF": {
+      "type": "Procedure",
+      "remarks": [
+        "Second definitive TF code, days 1-21. Negative control, as Closure_Procedure_TT."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "79733001",
+          "display": "Amputation above-knee [vocab query — OMOP 4195136]"
+        }
+      ],
+      "duration": {
+        "low": 90,
+        "high": 180,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Level_TF_Confirmed"
+    },
+    "Second_Code_TF_Escalated": {
+      "type": "Procedure",
+      "remarks": [
+        "ESCALATED at closure — guillotine was TT, closure is TF, so per MoRe the",
+        "INCIDENT LEVEL IS TF. A SQL that takes the level from the guillotine code",
+        "rather than the closure will mis-level exactly these patients."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "79733001",
+          "display": "Amputation above-knee [vocab query — OMOP 4195136]"
+        }
+      ],
+      "duration": {
+        "low": 120,
+        "high": 210,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Level_TF_Escalated"
+    },
+    "Second_Code_TT_Late": {
+      "type": "Procedure",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "88312006",
+          "display": "Amputation of leg through tibia and fibula [vocab query — OMOP 4338257]"
+        }
+      ],
+      "duration": {
+        "low": 60,
+        "high": 150,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Level_From_First_Code_TT"
+    },
+    "Second_Code_TF_Late": {
+      "type": "Procedure",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "79733001",
+          "display": "Amputation above-knee [vocab query — OMOP 4195136]"
+        }
+      ],
+      "duration": {
+        "low": 90,
+        "high": 180,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Level_From_First_Code_TF"
+    },
+    "Set_Definitive_True_Staged": {
+      "type": "SetAttribute",
+      "remarks": [
+        "⚠️ NOW ALWAYS TRUE. Without a guillotine code there is no signal that selects",
+        "MoRe's 22-365 day window, so the 1-365 window applies to everyone. This is the",
+        "item-16 DEVIATION: a temporal gate substitutes for MoRe's code-keyed rule."
+      ],
+      "attribute": "amp_index_definitive",
+      "value": true,
+      "direct_transition": "Set_Second_Code_Early"
+    },
+    "Set_Second_Code_Branch_Early": {
+      "type": "SetAttribute",
+      "attribute": "amp_index_closure_branch",
+      "value": "within_3wk",
+      "direct_transition": "Index_Sequence_Complete"
+    },
+    "Set_Second_Code_Branch_Late": {
+      "type": "SetAttribute",
+      "attribute": "amp_index_closure_branch",
+      "value": "late",
+      "direct_transition": "Index_Sequence_Complete"
+    },
+    "Set_Second_Code_Branch_None": {
+      "type": "SetAttribute",
+      "remarks": [
+        "Single-code index — no second amputation code. Labelled so the three arms account for every patient in QC."
+      ],
+      "attribute": "amp_index_closure_branch",
+      "value": "none",
+      "direct_transition": "Index_Sequence_Complete"
     }
   }
 }
