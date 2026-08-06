@@ -1,0 +1,735 @@
+{
+  "name": "PAD Amputation Index Level and Guillotine Sequence (pad_amp v2, base-module sub-graph)",
+  "remarks": [
+    "===========================================================================",
+    "WHAT THIS IS, AND HOW TO INSTALL IT",
+    "===========================================================================",
+    "The INDEX-EVENT sub-graph for pad_amp v2: incident amputation level, the",
+    "guillotine/definitive split, and the guillotine closure sequence that CLASSIFIES",
+    "the incident level. Destined for pad_amp_base.json once module composition is",
+    "wired (synthetic_data/registry.yaml :: pad_amp).",
+    "",
+    "⛔ IT IS A DROP-IN REPLACEMENT, NOT AN ADDITIONAL MODULE. Exactly one module",
+    "may own the index procedure — two owners is what inflated the v1 cohort ~2x (the",
+    "379 -> 196 correction). Install by REPLACING three states in pad_amp_dispo.json:",
+    "",
+    "    DELETE  Index_Procedure_Branch   (Simple, 0.4 AKA / 0.6 BKA)",
+    "    DELETE  Index_Procedure_AKA      (Procedure, SNOMED 79733001)",
+    "    DELETE  Index_Procedure          (Procedure, SNOMED 88312006)",
+    "",
+    "    IN-EDGE   Index_Admission_Encounter -> Index_Level_Draw",
+    "    OUT-EDGE  every terminal state here -> Post_Index_Inpatient_Delay",
+    "",
+    "The in- and out-edges are unchanged, so dispo's discharge-disposition, ED and",
+    "readmission logic downstream is untouched. The closure procedures deliberately",
+    "fire BEFORE the out-edge, i.e. while the index admission encounter is still",
+    "open — a staged amputation is one longer admission, which is also why guillotine",
+    "patients should show a longer LOS.",
+    "",
+    "===========================================================================",
+    "WHY THIS EXISTS: THE CLOSURE DEFINES THE INDEX LEVEL",
+    "===========================================================================",
+    "MoRe, Methods, 'Defining incident amputation level', verbatim:",
+    "",
+    "  'For guillotine procedures at the TT and TF level, it was assumed that a",
+    "   closure procedure would be performed within three weeks; therefore, a search",
+    "   forward three weeks for the next procedure code was performed TO CLASSIFY THE",
+    "   INCIDENT LEVEL. If the next subsequent procedure was more than three weeks",
+    "   after the initial guillotine procedure or there was no subsequent procedure,",
+    "   an error in the initial coding was presumed and the guillotine code was",
+    "   recoded as a definitive amputation.'",
+    "",
+    "So the closure is not an event that FOLLOWS the index — it DETERMINES it. A",
+    "guillotine TT closed at TF is an incident TF. That is why this belongs to the",
+    "index-owning module and not to pad_amp_reamp.json, which consumes",
+    "amp_index_level and amp_index_definitive as INPUTS.",
+    "",
+    "⭐ GUILLOTINES OCCUR ONLY AT TT AND TF. MoRe says so explicitly ('at the TT and",
+    "TF level'). TM is always definitive. This has a consequence that was previously",
+    "got wrong: the overall guillotine share is 20% of TT/TF patients = 13.2% of ALL",
+    "index patients, NOT 20% of all. An earlier pad_amp_reamp simulation assumed 20%",
+    "of everyone.",
+    "",
+    "===========================================================================",
+    "THE INITIAL LEVEL DRAW IS CORRECTED, AND MUST BE",
+    "===========================================================================",
+    "Escalation at closure migrates patients from TT to TF, so drawing the published",
+    "mix directly would leave the FINAL mix wrong. Solved 2026-08-06:",
+    "",
+    "  leak = P(guillotine|TT) x P(closure within 3wk) x P(escalate) = 0.20 x 0.85 x 0.125 = 0.02125",
+    "",
+    "  INITIAL draw (this module)     FINAL mix (what the cohort sees)   published",
+    "    TM  33.80%                     TM  33.8%                          33.8%",
+    "    TT  44.65%                     TT  43.7%                          43.7%",
+    "    TF  21.55%                     TF  22.5%                          22.5%",
+    "",
+    "⚠️ RE-SOLVE THE INITIAL DRAW if P(guillotine) or P(escalate) is retuned. The",
+    "arithmetic is t_TT = 43.7% / (1 - leak) and t_TF = 22.5% - t_TT x leak, where leak includes P(closure within 3wk).",
+    "",
+    "===========================================================================",
+    "THE THREE CLOSURE BRANCHES — all required, and branch (b) is the sharp one",
+    "===========================================================================",
+    "Registry acceptance criterion 2 requires all three. An earlier draft implemented",
+    "only (a).",
+    "",
+    "  (a) CLOSURE WITHIN 3 WEEKS — days 1-21, ~85% of guillotines",
+    "      Emits a SECOND DEFINITIVE AMPUTATION CODE. That code sets the level:",
+    "      ~87.5% same level, ~12.5% escalated TT->TF.",
+    "      amp_index_definitive = false  -> pad_amp_reamp uses the 22-365 window",
+    "      amp_decoy_early_revision = true",
+    "      ⭐ THIS IS THE STRONGEST NEGATIVE CONTROL IN THE DATASET. It is a second",
+    "      amputation code at the same level, 1-2 weeks out, that is PART OF THE",
+    "      INDEX EVENT and must NOT count as a re-amputation. Nothing distinguishes",
+    "      it from a real re-amputation except the date — which is exactly why a",
+    "      stump-revision code (the earlier mistake) was a far weaker test.",
+    "",
+    "  (b) CLOSURE AFTER 3 WEEKS — days 22-42, ~10% of guillotines",
+    "      MoRe recodes the guillotine as definitive, so the index level is the",
+    "      GUILLOTINE's level and amp_index_definitive = true. The late closure then",
+    "      falls INSIDE the 1-365 definitive window, so it IS a re-amputation.",
+    "      ⭐ THE SAME CODE AT DAY 20 vs DAY 25 FLIPS FROM INDEX-EVENT TO OUTCOME.",
+    "      That pair is the sharpest available test of the two-window rule, and no",
+    "      other construct in the dataset tests it.",
+    "      ⚠️ This module therefore sets amp_reamp_occurred = true, so pad_amp_reamp",
+    "      does not double-count. See the calibration note below.",
+    "",
+    "  (c) NO CLOSURE — ~5% of guillotines",
+    "      Same recoding as (b): level = the guillotine's, definitive = true.",
+    "      MoRe states BOTH this and the >3-week branch; ref 10 states only the",
+    "      >3-week one, so an implementation following ref 10 misses this entirely.",
+    "",
+    "The 85 / 10 / 5 split is RESEARCHER_ADJUSTS — MoRe implies (a) is the norm ('it",
+    "was assumed that a closure procedure would be performed within three weeks') and",
+    "treats (b) and (c) as coding errors, but publishes no frequencies.",
+    "",
+    "===========================================================================",
+    "⚠️ CALIBRATION INTERACTION WITH pad_amp_reamp.json — MEASURED, NOT PREDICTED",
+    "===========================================================================",
+    "Branch (b) hands ~1.32% of ALL index patients a re-amputation before",
+    "pad_amp_reamp runs (13.2% guillotine x 10% late closure). Those patients enter",
+    "the monthly loop with amp_reamp_occurred already true, so they skip the",
+    "re-amputation hazard and go straight to the ELEVATED death hazard.",
+    "",
+    "⭐ AN EARLIER NOTE HERE PREDICTED THIS WOULD PUSH THE MARGINAL FROM 27.7% TO",
+    "~29.0% AND THAT THE HAZARDS WOULD NEED RE-SOLVING. THAT WAS WRONG — it counted",
+    "the addition and ignored an offsetting effect built into the same design:",
+    "",
+    "  + branch (b) adds re-amputations, but only ~1.32% x (1 - 0.277) = ~0.95% net,",
+    "    since those patients would mostly have had one from the hazards anyway;",
+    "  - branch (a) sets amp_index_definitive = false for ~11.3% of patients, which",
+    "    triggers pad_amp_reamp's day-22 suppression and removes ONE of their twelve",
+    "    monthly hazard draws.",
+    "",
+    "The two nearly cancel. A composed simulation (300,000 patients, both modules",
+    "walked end to end, 2026-08-06) re-solved the hazard scales to 1.00 / 1.00 — i.e.",
+    "NO ADJUSTMENT NEEDED. Composed result:",
+    "",
+    "    ND/NR 57.75 (57.7) · ND/R 22.72 (22.9) · D/NR 14.43 (14.3) · D/R 5.10 (5.1)",
+    "    total absolute error 0.37 pp",
+    "    marginals: re-amputation 27.81% (28.0), death 19.53% (19.4)",
+    "    final level mix: TM 33.69 · TT 43.79 · TF 22.52  (33.8 / 43.7 / 22.5)",
+    "",
+    "Keep pad_amp_reamp's hazards at 0.0288 / 0.0403 / 0.0173 and 0.0156 / 0.0289.",
+    "RE-SIMULATE THE COMPOSED SYSTEM, not either module alone, after any retune —",
+    "that is the whole lesson of this note.",
+    "",
+    "===========================================================================",
+    "⛔ TODO [VOCAB] THE GUILLOTINE CODES ARE CPT4-ONLY. THIS IS THE BLOCKER.",
+    "===========================================================================",
+    "Verified against local omop_vocab 2026-08-06: there is NO SNOMED",
+    "guillotine-amputation concept. Every SNOMED 'guillotine' hit is unrelated",
+    "(tonsillectomy, paper cutter, execution). The only options are CPT4:",
+    "",
+    "    27882  Amputation, leg, through tibia and fibula; open, circular",
+    "           (guillotine)                                  -> OMOP 2105448  standard",
+    "    27592  Amputation, thigh, through femur, any level; open, circular",
+    "           (guillotine)                                  -> OMOP 2105211  standard",
+    "",
+    "This module emits CPT4 for those two states. pad_amp_dispo.json has only ever",
+    "emitted SNOMED-CT / RxNorm / LOINC, so CPT4 is UNPROVEN through this ETL.",
+    "",
+    "BEFORE TRUSTING ANY GUILLOTINE OUTPUT, run Steps 4-5 and confirm:",
+    "    SELECT COUNT(*) FROM procedure_occurrence WHERE procedure_concept_id IN (2105448, 2105211);",
+    "If that returns 0, the ETL is dropping CPT4 and:",
+    "  * the day-22 window is untestable,",
+    "  * branch (b)'s day-20-vs-day-25 flip cannot be constructed,",
+    "  * registry acceptance criterion 2 cannot be met.",
+    "The fix is to extend the ETL's vocabulary handling. Do NOT substitute a",
+    "definitive SNOMED code for the guillotine — that silently converts every",
+    "guillotine patient into a definitive one and produces a PASSING pre-flight that",
+    "tests nothing.",
+    "",
+    "===========================================================================",
+    "OUTPUT ATTRIBUTES (consumed by pad_amp_reamp.json)",
+    "===========================================================================",
+    "  amp_index_level            'TM' | 'TT' | 'TF'  — final, post-closure",
+    "  amp_index_definitive       true | false        — false only for branch (a)",
+    "  amp_decoy_early_revision   true                — branch (a) only",
+    "  amp_reamp_occurred         true                — branch (b) only",
+    "  amp_reamp_subtype          'same_level'        — branch (b) only",
+    "  amp_index_guillotine       true | false        — QC handle",
+    "  amp_index_closure_branch   'within_3wk' | 'late' | 'none' | NA",
+    "===========================================================================",
+    "CONCEPT PROVENANCE — every code [vocab query] 2026-08-06 against omop_vocab",
+    "  SNOMED 265739006 -> 4143797  Amputation through metatarsal bones      (TM)",
+    "  SNOMED 88312006  -> 4338257  Amputation of leg through tibia+fibula   (TT)",
+    "  SNOMED 79733001  -> 4195136  Amputation above-knee                    (TF)",
+    "  CPT4   27882     -> 2105448  TT guillotine",
+    "  CPT4   27592     -> 2105211  TF guillotine",
+    "==========================================================================="
+  ],
+  "states": {
+    "Initial": {
+      "type": "Initial",
+      "remarks": [
+        "Present only so this file validates and renders standalone. On install,",
+        "Index_Admission_Encounter transitions directly to Index_Level_Draw and this",
+        "state is discarded."
+      ],
+      "direct_transition": "Index_Level_Draw"
+    },
+    "Index_Level_Draw": {
+      "type": "Simple",
+      "remarks": [
+        "⚠️ THESE ARE THE CORRECTED INITIAL SHARES, NOT THE PUBLISHED MIX.",
+        "Escalation at closure migrates TT -> TF, so drawing 33.8/43.7/22.5 here",
+        "would leave the FINAL mix wrong. See the header for the arithmetic.",
+        "Re-solve if P(guillotine) or P(escalate) changes.",
+        "CORRECTED 2026-08-06 after simulating: the leak is 0.20 x 0.85 x 0.125 = 0.02125, NOT 0.20 x 0.125 — escalation is only reachable through branch (a), which is 85% of guillotines. The first draft over-corrected and ran TT +0.34pp high."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.338,
+          "transition": "Set_Level_TM"
+        },
+        {
+          "distribution": 0.44649,
+          "transition": "Set_Level_TT_Initial"
+        },
+        {
+          "distribution": 0.21551,
+          "transition": "Set_Level_TF_Initial"
+        }
+      ]
+    },
+    "Set_Level_TM": {
+      "type": "SetAttribute",
+      "remarks": [
+        "TM is ALWAYS definitive — MoRe describes guillotines only at TT and TF."
+      ],
+      "attribute": "amp_index_level",
+      "value": "TM",
+      "direct_transition": "Index_Procedure_TM"
+    },
+    "Index_Procedure_TM": {
+      "type": "Procedure",
+      "remarks": [
+        "Incident TM. SNOMED-CT 265739006 -> OMOP 4143797 [vocab query 2026-08-06].",
+        "⭐ NEW IN v2 — pad_amp v1 had NO transmetatarsal level at all, which is why",
+        "TM was a third of MoRe's cohort but 0% of the synthetic data.",
+        "Catalog: forefoot_midfoot_amputation, [DVI] 1891165."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "265739006",
+          "display": "Amputation through metatarsal bones [vocab query — OMOP 4143797]"
+        }
+      ],
+      "duration": {
+        "low": 60,
+        "high": 150,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Definitive_True_TM"
+    },
+    "Set_Definitive_True_TM": {
+      "type": "SetAttribute",
+      "attribute": "amp_index_definitive",
+      "value": true,
+      "direct_transition": "Set_Not_Guillotine"
+    },
+    "Set_Level_TT_Initial": {
+      "type": "SetAttribute",
+      "remarks": [
+        "Provisional — branch (a) escalation may overwrite this with TF."
+      ],
+      "attribute": "amp_index_level",
+      "value": "TT",
+      "direct_transition": "TT_Guillotine_Split"
+    },
+    "TT_Guillotine_Split": {
+      "type": "Simple",
+      "remarks": [
+        "P(guillotine | TT) = 0.20. RESEARCHER_ADJUSTS — not published; drives the whole two-window test."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.2,
+          "transition": "Index_Procedure_TT_Guillotine"
+        },
+        {
+          "distribution": 0.8,
+          "transition": "Index_Procedure_TT_Definitive"
+        }
+      ]
+    },
+    "Index_Procedure_TT_Definitive": {
+      "type": "Procedure",
+      "remarks": [
+        "Definitive TT. SNOMED-CT 88312006 -> OMOP 4338257 [vocab query 2026-08-06]."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "88312006",
+          "display": "Amputation of leg through tibia and fibula [vocab query — OMOP 4338257]"
+        }
+      ],
+      "duration": {
+        "low": 90,
+        "high": 180,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Definitive_True_TT"
+    },
+    "Set_Definitive_True_TT": {
+      "type": "SetAttribute",
+      "attribute": "amp_index_definitive",
+      "value": true,
+      "direct_transition": "Set_Not_Guillotine"
+    },
+    "Set_Level_TF_Initial": {
+      "type": "SetAttribute",
+      "attribute": "amp_index_level",
+      "value": "TF",
+      "direct_transition": "TF_Guillotine_Split"
+    },
+    "TF_Guillotine_Split": {
+      "type": "Simple",
+      "remarks": [
+        "P(guillotine | TF) = 0.20. RESEARCHER_ADJUSTS."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.2,
+          "transition": "Index_Procedure_TF_Guillotine"
+        },
+        {
+          "distribution": 0.8,
+          "transition": "Index_Procedure_TF_Definitive"
+        }
+      ]
+    },
+    "Index_Procedure_TF_Definitive": {
+      "type": "Procedure",
+      "remarks": [
+        "Definitive TF. SNOMED-CT 79733001 -> OMOP 4195136 [vocab query 2026-08-06]."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "79733001",
+          "display": "Amputation above-knee [vocab query — OMOP 4195136]"
+        }
+      ],
+      "duration": {
+        "low": 120,
+        "high": 210,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Definitive_True_TF"
+    },
+    "Set_Definitive_True_TF": {
+      "type": "SetAttribute",
+      "attribute": "amp_index_definitive",
+      "value": true,
+      "direct_transition": "Set_Not_Guillotine"
+    },
+    "Set_Not_Guillotine": {
+      "type": "SetAttribute",
+      "attribute": "amp_index_guillotine",
+      "value": false,
+      "direct_transition": "Index_Sequence_Complete"
+    },
+    "Index_Procedure_TT_Guillotine": {
+      "type": "Procedure",
+      "remarks": [
+        "⛔ CPT4, NOT SNOMED — see TODO [VOCAB] in the header. There is no SNOMED",
+        "guillotine-amputation concept in this vocabulary build.",
+        "CPT4 27882 -> OMOP 2105448, standard, Procedure domain [vocab query 2026-08-06].",
+        "If the ETL drops CPT4 this state produces nothing and every downstream",
+        "guillotine test silently passes on absent data."
+      ],
+      "codes": [
+        {
+          "system": "CPT4",
+          "code": "27882",
+          "display": "Amputation, leg, through tibia and fibula; open, circular (guillotine) [vocab query — OMOP 2105448]"
+        }
+      ],
+      "duration": {
+        "low": 45,
+        "high": 105,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Is_Guillotine_TT"
+    },
+    "Set_Is_Guillotine_TT": {
+      "type": "SetAttribute",
+      "attribute": "amp_index_guillotine",
+      "value": true,
+      "direct_transition": "TT_Closure_Branch"
+    },
+    "Index_Procedure_TF_Guillotine": {
+      "type": "Procedure",
+      "remarks": [
+        "⛔ CPT4, NOT SNOMED — see TODO [VOCAB]. CPT4 27592 -> OMOP 2105211,",
+        "standard [vocab query 2026-08-06]."
+      ],
+      "codes": [
+        {
+          "system": "CPT4",
+          "code": "27592",
+          "display": "Amputation, thigh, through femur, any level; open, circular (guillotine) [vocab query — OMOP 2105211]"
+        }
+      ],
+      "duration": {
+        "low": 60,
+        "high": 130,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Is_Guillotine_TF"
+    },
+    "Set_Is_Guillotine_TF": {
+      "type": "SetAttribute",
+      "attribute": "amp_index_guillotine",
+      "value": true,
+      "direct_transition": "TF_Closure_Branch"
+    },
+    "TT_Closure_Branch": {
+      "type": "Simple",
+      "remarks": [
+        "The three branches MoRe requires. 85/10/5 is RESEARCHER_ADJUSTS — MoRe",
+        "implies (a) is the norm and treats (b)/(c) as coding errors, but publishes",
+        "no frequencies."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.85,
+          "transition": "TT_Closure_Within_3wk_Delay"
+        },
+        {
+          "distribution": 0.1,
+          "transition": "TT_Closure_Late_Delay"
+        },
+        {
+          "distribution": 0.05,
+          "transition": "Set_Closure_Branch_None"
+        }
+      ]
+    },
+    "TT_Closure_Within_3wk_Delay": {
+      "type": "Delay",
+      "remarks": [
+        "Days 1-21 — inside MoRe's three-week search by construction. Day 21 is the",
+        "boundary that must NOT count as a re-amputation, against day 22 which must.",
+        "This is the 1-2 week second-BKA-code pattern seen in real claims."
+      ],
+      "range": {
+        "low": 1,
+        "high": 21,
+        "unit": "days"
+      },
+      "direct_transition": "TT_Closure_Escalation_Split"
+    },
+    "TT_Closure_Escalation_Split": {
+      "type": "Simple",
+      "remarks": [
+        "The closure CLASSIFIES the level. ~12.5% are closed higher than the",
+        "guillotine (TT -> TF) — a guillotine implies marginal tissue viability.",
+        "RESEARCHER_ADJUSTS, and the Index_Level_Draw shares above must be re-solved",
+        "if this changes."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.875,
+          "transition": "Closure_Procedure_TT"
+        },
+        {
+          "distribution": 0.125,
+          "transition": "Closure_Procedure_TF_Escalated"
+        }
+      ]
+    },
+    "Closure_Procedure_TT": {
+      "type": "Procedure",
+      "remarks": [
+        "⭐ THE STRONGEST NEGATIVE CONTROL. A SECOND definitive TT code 1-21 days",
+        "after the guillotine — identical to the index code, distinguished ONLY by",
+        "date. Part of the INDEX EVENT; must NOT count as a re-amputation."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "88312006",
+          "display": "Amputation of leg through tibia and fibula [vocab query — OMOP 4338257]"
+        }
+      ],
+      "duration": {
+        "low": 60,
+        "high": 150,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Level_TT_Confirmed"
+    },
+    "Set_Level_TT_Confirmed": {
+      "type": "SetAttribute",
+      "attribute": "amp_index_level",
+      "value": "TT",
+      "direct_transition": "Set_Definitive_False_Closed"
+    },
+    "Closure_Procedure_TF_Escalated": {
+      "type": "Procedure",
+      "remarks": [
+        "ESCALATED at closure — guillotine was TT, closure is TF, so per MoRe the",
+        "INCIDENT LEVEL IS TF. A SQL that takes the level from the guillotine code",
+        "rather than the closure will mis-level exactly these patients."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "79733001",
+          "display": "Amputation above-knee [vocab query — OMOP 4195136]"
+        }
+      ],
+      "duration": {
+        "low": 120,
+        "high": 210,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Level_TF_Escalated"
+    },
+    "Set_Level_TF_Escalated": {
+      "type": "SetAttribute",
+      "attribute": "amp_index_level",
+      "value": "TF",
+      "direct_transition": "Set_Definitive_False_Closed"
+    },
+    "TF_Closure_Branch": {
+      "type": "Simple",
+      "remarks": [
+        "Same three branches. No escalation arm — TF has nowhere higher within MoRe's levels."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.85,
+          "transition": "TF_Closure_Within_3wk_Delay"
+        },
+        {
+          "distribution": 0.1,
+          "transition": "TF_Closure_Late_Delay"
+        },
+        {
+          "distribution": 0.05,
+          "transition": "Set_Closure_Branch_None"
+        }
+      ]
+    },
+    "TF_Closure_Within_3wk_Delay": {
+      "type": "Delay",
+      "range": {
+        "low": 1,
+        "high": 21,
+        "unit": "days"
+      },
+      "direct_transition": "Closure_Procedure_TF"
+    },
+    "Closure_Procedure_TF": {
+      "type": "Procedure",
+      "remarks": [
+        "Second definitive TF code, days 1-21. Negative control, as Closure_Procedure_TT."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "79733001",
+          "display": "Amputation above-knee [vocab query — OMOP 4195136]"
+        }
+      ],
+      "duration": {
+        "low": 90,
+        "high": 180,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Level_TF_Confirmed"
+    },
+    "Set_Level_TF_Confirmed": {
+      "type": "SetAttribute",
+      "attribute": "amp_index_level",
+      "value": "TF",
+      "direct_transition": "Set_Definitive_False_Closed"
+    },
+    "Set_Definitive_False_Closed": {
+      "type": "SetAttribute",
+      "remarks": [
+        "definitive = FALSE. This is what makes pad_amp_reamp apply MoRe's 22-365",
+        "day window to these patients instead of 1-365."
+      ],
+      "attribute": "amp_index_definitive",
+      "value": false,
+      "direct_transition": "Set_Decoy_Early_Revision"
+    },
+    "Set_Decoy_Early_Revision": {
+      "type": "SetAttribute",
+      "remarks": [
+        "Ground truth: the closure must NOT be counted as a re-amputation. QC asserts an exact count."
+      ],
+      "attribute": "amp_decoy_early_revision",
+      "value": true,
+      "direct_transition": "Set_Closure_Branch_Within"
+    },
+    "Set_Closure_Branch_Within": {
+      "type": "SetAttribute",
+      "attribute": "amp_index_closure_branch",
+      "value": "within_3wk",
+      "direct_transition": "Index_Sequence_Complete"
+    },
+    "TT_Closure_Late_Delay": {
+      "type": "Delay",
+      "remarks": [
+        "Branch (b), days 22-42. MoRe: 'an error in the initial coding was presumed",
+        "and the guillotine code was recoded as a definitive amputation.'",
+        "⭐ THE SHARPEST TEST IN THE DATASET: the SAME code at day 20 is part of the",
+        "index event, at day 25 it is an outcome. Nothing else tests that."
+      ],
+      "range": {
+        "low": 22,
+        "high": 42,
+        "unit": "days"
+      },
+      "direct_transition": "Closure_Procedure_TT_Late"
+    },
+    "Closure_Procedure_TT_Late": {
+      "type": "Procedure",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "88312006",
+          "display": "Amputation of leg through tibia and fibula [vocab query — OMOP 4338257]"
+        }
+      ],
+      "duration": {
+        "low": 60,
+        "high": 150,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Level_From_Guillotine_TT"
+    },
+    "Set_Level_From_Guillotine_TT": {
+      "type": "SetAttribute",
+      "remarks": [
+        "Level comes from the GUILLOTINE, not the late closure — the guillotine was recoded as the definitive index."
+      ],
+      "attribute": "amp_index_level",
+      "value": "TT",
+      "direct_transition": "Set_Definitive_True_Recoded"
+    },
+    "TF_Closure_Late_Delay": {
+      "type": "Delay",
+      "range": {
+        "low": 22,
+        "high": 42,
+        "unit": "days"
+      },
+      "direct_transition": "Closure_Procedure_TF_Late"
+    },
+    "Closure_Procedure_TF_Late": {
+      "type": "Procedure",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "79733001",
+          "display": "Amputation above-knee [vocab query — OMOP 4195136]"
+        }
+      ],
+      "duration": {
+        "low": 90,
+        "high": 180,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Level_From_Guillotine_TF"
+    },
+    "Set_Level_From_Guillotine_TF": {
+      "type": "SetAttribute",
+      "attribute": "amp_index_level",
+      "value": "TF",
+      "direct_transition": "Set_Definitive_True_Recoded"
+    },
+    "Set_Definitive_True_Recoded": {
+      "type": "SetAttribute",
+      "remarks": [
+        "Guillotine recoded as definitive -> the 1-365 day window applies, so the late closure IS eligible."
+      ],
+      "attribute": "amp_index_definitive",
+      "value": true,
+      "direct_transition": "Set_Late_Closure_Is_Reamp"
+    },
+    "Set_Late_Closure_Is_Reamp": {
+      "type": "SetAttribute",
+      "remarks": [
+        "⚠️ CALIBRATION INTERACTION. The late closure sits inside the 1-365 window, so",
+        "it IS a re-amputation. Flagging it here stops pad_amp_reamp double-counting",
+        "— its Reamp_Already_Occurred_Check skips these patients to the ELEVATED death",
+        "hazard. Costs ~1.32% of all patients as 'free' re-amputations, pushing the",
+        "marginal from ~27.7% to ~29.0%, so pad_amp_reamp's monthly hazards MUST be",
+        "re-solved once this module is installed."
+      ],
+      "attribute": "amp_reamp_occurred",
+      "value": true,
+      "direct_transition": "Set_Late_Closure_Subtype"
+    },
+    "Set_Late_Closure_Subtype": {
+      "type": "SetAttribute",
+      "attribute": "amp_reamp_subtype",
+      "value": "same_level",
+      "direct_transition": "Set_Closure_Branch_Late"
+    },
+    "Set_Closure_Branch_Late": {
+      "type": "SetAttribute",
+      "attribute": "amp_index_closure_branch",
+      "value": "late",
+      "direct_transition": "Index_Sequence_Complete"
+    },
+    "Set_Closure_Branch_None": {
+      "type": "SetAttribute",
+      "remarks": [
+        "Branch (c). No closure ever appears, so the guillotine is recoded as the",
+        "definitive index at its own level — which the provisional Set_Level_*_Initial",
+        "already holds, so only definitive needs setting.",
+        "MoRe states this branch; ref 10 states only the >3-week one, so an",
+        "implementation following ref 10 misses it entirely."
+      ],
+      "attribute": "amp_index_closure_branch",
+      "value": "none",
+      "direct_transition": "Set_Definitive_True_No_Closure"
+    },
+    "Set_Definitive_True_No_Closure": {
+      "type": "SetAttribute",
+      "attribute": "amp_index_definitive",
+      "value": true,
+      "direct_transition": "Index_Sequence_Complete"
+    },
+    "Index_Sequence_Complete": {
+      "type": "Simple",
+      "remarks": [
+        "⛔ ON INSTALL, REPOINT THIS AT Post_Index_Inpatient_Delay in",
+        "pad_amp_dispo.json. It is a Terminal only so this file validates standalone."
+      ],
+      "direct_transition": "Terminal"
+    },
+    "Terminal": {
+      "type": "Terminal"
+    }
+  }
+}

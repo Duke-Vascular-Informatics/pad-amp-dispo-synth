@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>pad_amp_reamp — Synthea State Diagram</title>
+  <title>pad_amp_reamp — state diagram</title>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -31,8 +31,7 @@
 </head>
 <body>
   <h1>pad_amp_reamp — state diagram</h1>
-  <p class="sub">Re-amputation and mortality for <code>pad_amp</code> v2 &middot;
-     45 states &middot; generated from
+  <p class="sub">Re-amputation and mortality (outcome side) for <code>pad_amp</code> v2 &middot; 45 states &middot; generated from
      <code>pad_amp_reamp.json</code>, not hand-drawn.</p>
 
   <h2>Legend</h2>
@@ -45,6 +44,7 @@
       <li><span class="sw" style="background:#e0f2fe"></span>Routing / branch</li>
       <li><span class="sw" style="background:#f5f5f4"></span>Attribute (QC handle)</li>
   </ul>
+
 
   <h2>Published targets the diagram must reproduce</h2>
   <table>
@@ -89,6 +89,7 @@
     because <code>minor_amputation</code> contains toe and ray, so SQL built from that
     broad set rather than <code>forefoot_midfoot_amputation</code> will over-count.
   </div>
+
 
   <h2>Diagram</h2>
   <div class="diagram-box">
