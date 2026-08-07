@@ -72,6 +72,16 @@ source("R/connection.R")
 #                          incremental / resumption runs.
 #   synthea_bulk_load      Attempt high-speed JDBC bulk insert first.  Falls
 #                          back automatically to row-by-row mode on failure.
+#   use_shared_vocab_maps  Build source_to_standard_vocab_map and
+#                          source_to_source_vocab_map once in shared_map_schema
+#                          and wire this CDM schema to them with synonyms,
+#                          instead of materializing a private ~3.9 GB copy of
+#                          each per run.  IGNORED unless use_shared_vocab_schema
+#                          is also TRUE: the maps are a function of the
+#                          vocabulary, so they may only be shared by schemas
+#                          that share the vocabulary itself.  Default TRUE.
+#   shared_map_schema      Schema holding the shared vocab maps.
+#                          Default: "omop_etl_maps".
 #   verbose                Emit [INFO]/[WARN] log messages during execution.
 run_synthea_full_csv_builder_etl <- function(
     csv_input_dir,
@@ -88,6 +98,8 @@ run_synthea_full_csv_builder_etl <- function(
     synthea_bulk_load = TRUE,
     use_shared_vocab_schema = FALSE,
     shared_vocab_schema = "omop_vocab",
+    use_shared_vocab_maps = TRUE,
+    shared_map_schema = "omop_etl_maps",
     verbose = TRUE) {
 
   # ---------------------------------------------------------------------------
@@ -110,6 +122,15 @@ run_synthea_full_csv_builder_etl <- function(
   } else {
     NULL
   }
+
+  # Shared vocab maps are only sound when the vocabulary itself is shared: the
+  # two map tables are a pure function of concept / concept_relationship /
+  # source_to_concept_map, so schemas that each carry their own vocabulary copy
+  # could legitimately produce different maps and must not share one. Gating
+  # here (rather than at each use site) keeps that invariant in one place.
+  # (The warning for a downgraded request is emitted in section 7, once log_msg
+  # is defined.)
+  use_shared_maps <- isTRUE(use_shared_vocab_maps) && isTRUE(use_shared_vocab_schema)
 
   # ---------------------------------------------------------------------------
   # 2. Logging and progress-bar helpers
@@ -975,11 +996,26 @@ run_synthea_full_csv_builder_etl <- function(
     conn_events <- connect_with_retry(connection_details)
     on.exit(DatabaseConnector::disconnect(conn_events), add = TRUE)
 
-    map_sql_files <- c(
-      file.path("output", "create_source_to_standard_vocab_map.sql"),
-      file.path("output", "create_source_to_source_vocab_map.sql"),
+    # On the shared-map path the two vocab-map SQLs are deliberately skipped:
+    # the tables they would build already exist once in shared_map_schema and
+    # this schema reaches them through synonyms. Running them anyway would fail
+    # loudly (SELECT * INTO rejects a synonym name) rather than silently forking
+    # a private copy, but skipping is the point — it is the ~3.9 GB and the
+    # multi-GB transaction-log burst we are avoiding.
+    #
+    # create_states_map.sql always runs: states_map is tiny and stays per-schema.
+    #
+    # NOTE: this repo calls CreateMapAndRollupTables() without outputFolder, so
+    # ETLSyntheaBuilder writes to output/ rather than the template's output/etl/.
+    map_sql_files <- if (use_shared_maps) {
       file.path("output", "create_states_map.sql")
-    )
+    } else {
+      c(
+        file.path("output", "create_source_to_standard_vocab_map.sql"),
+        file.path("output", "create_source_to_source_vocab_map.sql"),
+        file.path("output", "create_states_map.sql")
+      )
+    }
     for (sql_file in map_sql_files) {
       execute_sql_file(conn_events, sql_file)
       if (!is.null(progress_tracker)) {
@@ -992,47 +1028,55 @@ run_synthea_full_csv_builder_etl <- function(
     # INSERT filters on (source_code, source_vocabulary_id, target_domain_id /
     # target_vocabulary_id) so a composite key on those columns eliminates the
     # full-table-scan + hash-join pattern that is otherwise required.
-    message("[PERF] Adding composite indexes on source_to_standard_vocab_map and source_to_source_vocab_map...")
-    vocab_map_index_sql <- SqlRender::translate(
-      SqlRender::render(
-        "IF OBJECT_ID('@cdm_schema.source_to_standard_vocab_map', 'U') IS NOT NULL
-         BEGIN
-           IF NOT EXISTS (
-             SELECT 1 FROM sys.indexes
-             WHERE object_id = OBJECT_ID('@cdm_schema.source_to_standard_vocab_map')
-               AND name = 'IX_stdvm_code_vocab_domain'
-           )
+    #
+    # On the shared-map path these indexes already exist on the real tables in
+    # shared_map_schema (build_shared_vocab_maps creates them), and a synonym
+    # cannot carry an index of its own — queries here use the base table's.
+    # The block below is skipped explicitly rather than relying on the fact that
+    # its OBJECT_ID(...,'U') guards happen to return NULL for a synonym.
+    if (!use_shared_maps) {
+      message("[PERF] Adding composite indexes on source_to_standard_vocab_map and source_to_source_vocab_map...")
+      vocab_map_index_sql <- SqlRender::translate(
+        SqlRender::render(
+          "IF OBJECT_ID('@cdm_schema.source_to_standard_vocab_map', 'U') IS NOT NULL
            BEGIN
-             CREATE INDEX IX_stdvm_code_vocab_domain
-               ON @cdm_schema.source_to_standard_vocab_map
-                 (source_code, source_vocabulary_id, target_domain_id)
-               INCLUDE (target_concept_id, target_vocabulary_id,
-                        target_standard_concept, target_invalid_reason,
-                        source_concept_id);
+             IF NOT EXISTS (
+               SELECT 1 FROM sys.indexes
+               WHERE object_id = OBJECT_ID('@cdm_schema.source_to_standard_vocab_map')
+                 AND name = 'IX_stdvm_code_vocab_domain'
+             )
+             BEGIN
+               CREATE INDEX IX_stdvm_code_vocab_domain
+                 ON @cdm_schema.source_to_standard_vocab_map
+                   (source_code, source_vocabulary_id, target_domain_id)
+                 INCLUDE (target_concept_id, target_vocabulary_id,
+                          target_standard_concept, target_invalid_reason,
+                          source_concept_id);
+             END;
            END;
-         END;
 
-         IF OBJECT_ID('@cdm_schema.source_to_source_vocab_map', 'U') IS NOT NULL
-         BEGIN
-           IF NOT EXISTS (
-             SELECT 1 FROM sys.indexes
-             WHERE object_id = OBJECT_ID('@cdm_schema.source_to_source_vocab_map')
-               AND name = 'IX_srcvm_code_vocab'
-           )
+           IF OBJECT_ID('@cdm_schema.source_to_source_vocab_map', 'U') IS NOT NULL
            BEGIN
-             CREATE INDEX IX_srcvm_code_vocab
-               ON @cdm_schema.source_to_source_vocab_map
-                 (source_code, source_vocabulary_id)
-               INCLUDE (source_concept_id, source_domain_id,
-                        target_concept_id, target_vocabulary_id);
-           END;
-         END;",
-        cdm_schema = config$cdm_schema
-      ),
-      targetDialect = config$dbms
-    )
-    execute_sql_with_retry(conn_events, vocab_map_index_sql)
-    message("[PERF] Vocab map composite indexes ready.")
+             IF NOT EXISTS (
+               SELECT 1 FROM sys.indexes
+               WHERE object_id = OBJECT_ID('@cdm_schema.source_to_source_vocab_map')
+                 AND name = 'IX_srcvm_code_vocab'
+             )
+             BEGIN
+               CREATE INDEX IX_srcvm_code_vocab
+                 ON @cdm_schema.source_to_source_vocab_map
+                   (source_code, source_vocabulary_id)
+                 INCLUDE (source_concept_id, source_domain_id,
+                          target_concept_id, target_vocabulary_id);
+             END;
+           END;",
+          cdm_schema = config$cdm_schema
+        ),
+        targetDialect = config$dbms
+      )
+      execute_sql_with_retry(conn_events, vocab_map_index_sql)
+      message("[PERF] Vocab map composite indexes ready.")
+    }
 
     event_sql_files <- c(
       file.path("output", "insert_location.sql"),
@@ -1169,10 +1213,20 @@ run_synthea_full_csv_builder_etl <- function(
     log_msg("vocab_file_loc: ", ifelse(is.null(active_vocab_file_loc), "<unset>", active_vocab_file_loc))
   }
 
-  map_table_count <- 3L
+  log_msg("use_shared_vocab_maps: ", ifelse(use_shared_maps,
+                                            paste0("true -> ", shared_map_schema), "false"))
+
+  # Map SQL files executed below: create_source_to_standard_vocab_map,
+  # create_source_to_source_vocab_map, create_states_map. On the shared-map path
+  # only create_states_map runs (states_map stays per-schema), and one extra tick
+  # covers the shared-map build/wire step.
+  map_table_count <- if (use_shared_maps) 1L else 3L
   event_table_count <- 19L
   progress_total_steps <- 9L + map_table_count + event_table_count
   if (isTRUE(reload_vocab_from_csv)) {
+    progress_total_steps <- progress_total_steps + 1L
+  }
+  if (use_shared_maps) {
     progress_total_steps <- progress_total_steps + 1L
   }
   progress <- create_progress_tracker(progress_total_steps)
@@ -1191,6 +1245,76 @@ run_synthea_full_csv_builder_etl <- function(
     source("R/db_maintenance.R")
     create_vocab_synonyms(config, config$cdm_schema, shared_vocab_schema)
     progress$tick("Vocabulary synonyms wired to shared schema")
+  }
+
+  if (isTRUE(use_shared_vocab_maps) && !isTRUE(use_shared_vocab_schema)) {
+    log_msg(
+      "use_shared_vocab_maps=TRUE ignored because use_shared_vocab_schema=FALSE; ",
+      "using per-schema vocab maps.",
+      level = "WARN"
+    )
+  }
+
+  # ---------------------------------------------------------------------------
+  # Shared ETL vocabulary maps.
+  #
+  # Build source_to_standard_vocab_map / source_to_source_vocab_map once in
+  # shared_map_schema and point this CDM schema at them, replacing the ~3.9 GB
+  # private copy each run used to materialize. build_shared_vocab_maps() is
+  # idempotent and only rebuilds when the OMOP vocabulary release marker moves,
+  # so the expensive path runs once per vocabulary — not once per dataset.
+  #
+  # replace_existing_tables = TRUE mirrors what the map-creation SQL being
+  # skipped did anyway: create_source_to_*_vocab_map.sql opens with its own
+  # unconditional DROP TABLE of exactly these objects.
+  #
+  # Two things can send this back to per-schema maps mid-run:
+  #   - build returns usable = FALSE: the shared maps were built by a NEWER
+  #     builder version than this repo carries, so this repo must neither use
+  #     nor rebuild them (see .SHARED_VOCAB_MAP_BUILDER_VERSION).
+  #   - wiring is refused: this schema carries custom source_to_concept_map
+  #     rows the shared maps do not reflect.
+  # Both fall back to a correct-but-larger per-schema build. The fallback MUST
+  # drop any synonyms an earlier run left behind first, because SELECT * INTO
+  # is rejected against a synonym name — without that, the per-schema map SQL
+  # would fail instead of rebuilding.
+  # ---------------------------------------------------------------------------
+  if (use_shared_maps) {
+    log_msg("Vocab map path: shared maps in '", shared_map_schema, "'")
+    source("R/db_maintenance.R")
+
+    map_build <- build_shared_vocab_maps(
+      cfg                 = config,
+      shared_map_schema   = shared_map_schema,
+      shared_vocab_schema = shared_vocab_schema,
+      cdm_version         = cdm_version
+    )
+
+    if (!isTRUE(map_build$usable)) {
+      log_msg("Shared vocab maps in '", shared_map_schema, "' were built by a ",
+              "newer builder version than this repo carries; falling back to ",
+              "per-schema maps for this run. Run /sync-template to catch up.",
+              level = "WARN")
+      use_shared_maps <- FALSE
+    } else {
+      wired <- create_vocab_map_synonyms(
+        cfg                     = config,
+        target_schema           = config$cdm_schema,
+        shared_map_schema       = shared_map_schema,
+        replace_existing_tables = TRUE
+      )
+      if (!isTRUE(wired)) {
+        log_msg("Shared vocab maps not wired for '", config$cdm_schema,
+                "'; falling back to per-schema maps for this run.", level = "WARN")
+        use_shared_maps <- FALSE
+      }
+    }
+
+    if (!use_shared_maps) {
+      remove_vocab_map_synonyms(config, config$cdm_schema)
+    }
+
+    progress$tick("Vocabulary maps wired to shared schema")
   }
 
   # Verify (or create) all OMOP CDM tables in the target schema.  This step
@@ -1265,7 +1389,15 @@ run_synthea_full_csv_builder_etl <- function(
       if (nrow(log_meta) > 0L) {
         log_file_name <- as.character(log_meta$log_name[[1]])
         log_size_mb   <- as.numeric(log_meta$size_mb[[1]])
-        target_mb     <- 25600L   # 25 GB
+
+        # 25 GB was sized for create_source_to_standard_vocab_map, which builds
+        # the whole source->standard map from the ~6.3M-concept vocabulary in a
+        # single transaction. On the shared-map path that statement does not run
+        # here at all (build_shared_vocab_maps already paid it, once), so the
+        # remaining domain INSERTs need far less headroom. Pre-growing to 25 GB
+        # anyway starves the data file on a small VM disk — the failure mode
+        # this workspace has hit repeatedly.
+        target_mb     <- if (use_shared_maps) 4096L else 25600L
 
         # Switch to SIMPLE recovery so ETL checkpoints can truncate the log
         execute_sql_with_retry(conn_log,
