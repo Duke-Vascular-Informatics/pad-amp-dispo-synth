@@ -31,7 +31,13 @@
 #          any failure so Step 5 aborts cleanly before touching OMOP tables.
 # -----------------------------------------------------------------------------
 prepare_txlog_for_bulk_etl <- function(cfg,
-                                       target_min_mb = 25600L,
+                                       # REDUCED 2026-08-06 from 25600. A 25 GB pre-grow
+                                       # exhausts mssql_dev's 79 GB volume: the data files
+                                       # already hold ~24 GB (omop_vocab alone is 10.5 GB),
+                                       # so pre-growing the log to 25 GB leaves nothing for
+                                       # the CDM being loaded and the ETL dies at 99% full.
+                                       # 8 GB is ample for a ~1.7k-patient Synthea load.
+                                       target_min_mb = 8192L,
                                        autogrowth_mb = 2048L,
                                        shrink_to_mb  = 1024L) {
 

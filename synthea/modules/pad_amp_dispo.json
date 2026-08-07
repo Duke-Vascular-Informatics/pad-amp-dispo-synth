@@ -1,8 +1,23 @@
 {
-  "name": "PAD Amputation Disposition \u2014 Synthetic Data Module",
+  "name": "PAD Amputation Disposition — Synthetic Data Module",
   "remarks": [
+    "⭐ pad_amp v2 — MERGED 2026-08-06.",
+    "This file now contains three sub-graphs. The authoritative, reviewable copies",
+    "of the two new ones live alongside it and MUST be edited there first, then",
+    "re-merged with scripts/merge_v2_modules.py:",
+    "    synthea/module_sources/pad_amp_index_sequence.json  incident level + staged second-code pattern",
+    "    synthea/module_sources/pad_amp_reamp.json           re-amputation + mortality, 12 monthly slices",
+    "Merged into one file because module composition is not wired (Step 3 hard-fails",
+    "on extra workspace-authored modules) and exactly one module may own the index",
+    "⚠️ THE SUB-GRAPHS LIVE IN synthea/module_sources/, NOT synthea/modules/. Steps 3",
+    "and 4 both auto-detect the study module with `find synthea/modules -name '*.json'",
+    "| head -1`, so any extra JSON there is a coin-flip for which module gets built —",
+    "and syncing a sub-graph separately would double-emit the index event, which is",
+    "exactly the v1 379 -> 196 inflation. Keep runtime modules to ONE file.",
+    "procedure — two owners caused the v1 379 -> 196 inflation.",
+    "",
     "=======================================================================",
-    "SYNTHEA MODULE \u2014 pad_amp_dispo (data-generation-only, repo: pad-amp-dispo-synth)",
+    "SYNTHEA MODULE — pad_amp_dispo (data-generation-only, repo: pad-amp-dispo-synth)",
     "Generates the synthetic OMOP CDM consumed by pad-amp-ed-desc (Strategus).",
     "Post-amputation ED visit descriptive study.",
     "Patients: adults with dysvascular/diabetic/wound-related major lower",
@@ -12,7 +27,7 @@
     "Frailty burden: VA Frailty Index (30 deficits).",
     "=======================================================================",
     "",
-    "REFERENCE \u2014 VA Frailty Index:",
+    "REFERENCE — VA Frailty Index:",
     "  Cheng et al., J Gerontol A Biol Sci Med Sci 2021. PMID 33693638.",
     "  doi:10.1093/gerona/glab071",
     "  GitHub: https://github.com/bostoninformatics/va_frailty_index",
@@ -25,17 +40,17 @@
     "  See module commit history for verification details.",
     "",
     "  Vocab verification date: 2026-07-05.",
-    "  See CLAUDE.md Rule 1 \u2014 Concept ID Transparency.",
+    "  See CLAUDE.md Rule 1 — Concept ID Transparency.",
     "",
     "CLINICAL PATHWAY OVERVIEW:",
     "  Phase 1  Eligibility     Age guard (min 50, cap 100); onset delay",
-    "  Phase 2  Exposure: 3-way distribution \u2014 30% PVD-only / 30% PVD+DM / 40% DM-only",
+    "  Phase 2  Exposure: 3-way distribution — 30% PVD-only / 30% PVD+DM / 40% DM-only",
     "  Phase 3  Frailty         30 VA-FI comorbidity states (sequential)",
     "  Phase 4  Treatment       Oversampling branch (5% non-exposed / 95% exposed)",
     "  Phase 5  Pre-index       Delay: 7-90 days (urgent/semi-elective amputation)",
     "  Phase 6  Index           Inpatient admission + major amputation procedure",
     "  Phase 7  Recovery        Inpatient stay 7-21 days post-amputation",
-    "  Phase 8  Observation     Post-discharge window: 10-83 days (\u2192 90-day total)",
+    "  Phase 8  Observation     Post-discharge window: 10-83 days (→ 90-day total)",
     "  Phase 9  Outcome gate    35% fixed ED-visit incidence (RESEARCHER_ADJUSTS)",
     "  Phase 10 Outcome         ED encounter (visit_concept_id 9203 in OMOP)",
     "",
@@ -55,7 +70,7 @@
     "  as a discrete VA-FI deficit record in the comorbidity window.",
     "",
     "OVERSAMPLING:",
-    "  5% non-exposed / 95% exposed. Descriptive study \u2014 near-universal",
+    "  5% non-exposed / 95% exposed. Descriptive study — near-universal",
     "  exposure (amputation) by design. Real-world non-operative rate in",
     "  this severity of PAD is <5%.",
     "",
@@ -99,7 +114,7 @@
       "type": "Delay",
       "remarks": [
         "Random delay after age 50 before PAD diagnosis. Spreads cohort entry",
-        "across the study period (2017-2025). Range 0-30 years \u2192 index ages 50-80.",
+        "across the study period (2017-2025). Range 0-30 years → index ages 50-80.",
         "RESEARCHER_ADJUSTS: narrow range for specific age window."
       ],
       "range": {
@@ -123,7 +138,7 @@
             "quantity": 100,
             "unit": "years"
           },
-          "transition": "Terminal"
+          "transition": "Index_Attributes_Guard"
         },
         {
           "transition": "Cohort_Entry_Distribution"
@@ -133,7 +148,7 @@
     "Cohort_Entry_Distribution": {
       "type": "Simple",
       "remarks": [
-        "COHORT ENTRY DISTRIBUTION \u2014 dysvascular amputation indication mix.",
+        "COHORT ENTRY DISTRIBUTION — dysvascular amputation indication mix.",
         "  30% PVD-only  (peripheral arterial disease, no diabetes at index)",
         "  30% PVD + DM  (combined dysvascular/diabetic indication)",
         "  40% DM-only   (diabetic indication, no documented PVD at index)",
@@ -159,7 +174,7 @@
       "type": "ConditionOnset",
       "remarks": [
         "PVD-only indication (30% of cohort).",
-        "SNOMED-CT 400047006 'Peripheral vascular disease' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 400047006 'Peripheral vascular disease' [vocab query — 2026-07-05].",
         "No diabetes at index. Patient may still develop DM as a covariate",
         "in the prior observation window (captured by Cov_DM_Check)."
       ],
@@ -167,7 +182,7 @@
         {
           "system": "SNOMED-CT",
           "code": "400047006",
-          "display": "Peripheral vascular disease [vocab query \u2014 2026-07-05]"
+          "display": "Peripheral vascular disease [vocab query — 2026-07-05]"
         }
       ],
       "assign_to_attribute": "exposure_condition",
@@ -176,14 +191,14 @@
     "Exposure_PVD_DM_PAD": {
       "type": "ConditionOnset",
       "remarks": [
-        "PVD + DM combined indication (30% of cohort) \u2014 step 1 of 2: PVD onset.",
-        "SNOMED-CT 400047006 'Peripheral vascular disease' [vocab query \u2014 2026-07-05]."
+        "PVD + DM combined indication (30% of cohort) — step 1 of 2: PVD onset.",
+        "SNOMED-CT 400047006 'Peripheral vascular disease' [vocab query — 2026-07-05]."
       ],
       "codes": [
         {
           "system": "SNOMED-CT",
           "code": "400047006",
-          "display": "Peripheral vascular disease [vocab query \u2014 2026-07-05]"
+          "display": "Peripheral vascular disease [vocab query — 2026-07-05]"
         }
       ],
       "assign_to_attribute": "exposure_condition",
@@ -192,15 +207,15 @@
     "Exposure_PVD_DM_DM": {
       "type": "ConditionOnset",
       "remarks": [
-        "PVD + DM combined indication (30% of cohort) \u2014 step 2 of 2: DM onset.",
-        "SNOMED-CT 44054006 'Type 2 diabetes mellitus' [vocab query \u2014 2026-07-05].",
+        "PVD + DM combined indication (30% of cohort) — step 2 of 2: DM onset.",
+        "SNOMED-CT 44054006 'Type 2 diabetes mellitus' [vocab query — 2026-07-05].",
         "Both conditions present at cohort entry."
       ],
       "codes": [
         {
           "system": "SNOMED-CT",
           "code": "44054006",
-          "display": "Type 2 diabetes mellitus [vocab query \u2014 2026-07-05]"
+          "display": "Type 2 diabetes mellitus [vocab query — 2026-07-05]"
         }
       ],
       "direct_transition": "Index_Diagnosis_Encounter"
@@ -209,14 +224,14 @@
       "type": "ConditionOnset",
       "remarks": [
         "DM-only indication (40% of cohort).",
-        "SNOMED-CT 44054006 'Type 2 diabetes mellitus' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 44054006 'Type 2 diabetes mellitus' [vocab query — 2026-07-05].",
         "No PVD recorded at index. Diabetic foot wound / neuropathic indication."
       ],
       "codes": [
         {
           "system": "SNOMED-CT",
           "code": "44054006",
-          "display": "Type 2 diabetes mellitus [vocab query \u2014 2026-07-05]"
+          "display": "Type 2 diabetes mellitus [vocab query — 2026-07-05]"
         }
       ],
       "assign_to_attribute": "exposure_condition",
@@ -227,7 +242,7 @@
       "remarks": [
         "Outpatient vascular surgery evaluation. Encounter stays open through all",
         "VA-FI covariate states and closes at Treatment_Strategy path-end.",
-        "SNOMED-CT 185349003 'Encounter for check up' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 185349003 'Encounter for check up' [vocab query — 2026-07-05].",
         "REPLACE with appropriate outpatient evaluation code after vocab query."
       ],
       "encounter_class": "outpatient",
@@ -235,7 +250,7 @@
         {
           "system": "SNOMED-CT",
           "code": "185349003",
-          "display": "Encounter for check up [vocab query \u2014 OMOP 4185932]"
+          "display": "Encounter for check up [vocab query — OMOP 4185932]"
         }
       ],
       "reason": "exposure_condition",
@@ -262,14 +277,14 @@
     "Cov_AFib_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 49436004 'Atrial fibrillation' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 49436004 'Atrial fibrillation' [vocab query — 2026-07-05].",
         "Verify: Rscript scripts/concept_lookup.R 'atrial fibrillation' Condition"
       ],
       "codes": [
         {
           "system": "SNOMED-CT",
           "code": "49436004",
-          "display": "Atrial fibrillation [vocab query \u2014 OMOP 313217]"
+          "display": "Atrial fibrillation [vocab query — OMOP 313217]"
         }
       ],
       "direct_transition": "Cov_CAD_Check"
@@ -278,7 +293,7 @@
       "type": "Simple",
       "remarks": [
         "VA-FI Deficit 2 of 30: Coronary artery disease.",
-        "Prevalence: 50% \u2014 high in dysvascular PAD population. (RESEARCHER_ADJUSTS)",
+        "Prevalence: 50% — high in dysvascular PAD population. (RESEARCHER_ADJUSTS)",
         "ICD-10: I25.x."
       ],
       "distributed_transition": [
@@ -295,14 +310,14 @@
     "Cov_CAD_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 53741008 'Coronary arteriosclerosis' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 53741008 'Coronary arteriosclerosis' [vocab query — 2026-07-05].",
         "Verify: Rscript scripts/concept_lookup.R 'coronary artery disease' Condition"
       ],
       "codes": [
         {
           "system": "SNOMED-CT",
           "code": "53741008",
-          "display": "Coronary arteriosclerosis [vocab query \u2014 OMOP 317576]"
+          "display": "Coronary arteriosclerosis [vocab query — OMOP 317576]"
         }
       ],
       "direct_transition": "Cov_CHF_Check"
@@ -328,14 +343,14 @@
     "Cov_CHF_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 84114007 'Heart failure' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 84114007 'Heart failure' [vocab query — 2026-07-05].",
         "Verify: Rscript scripts/concept_lookup.R 'heart failure' Condition"
       ],
       "codes": [
         {
           "system": "SNOMED-CT",
           "code": "84114007",
-          "display": "Heart failure [vocab query \u2014 OMOP 316139]"
+          "display": "Heart failure [vocab query — OMOP 316139]"
         }
       ],
       "direct_transition": "Cov_HTN_Check"
@@ -344,11 +359,11 @@
       "type": "Simple",
       "remarks": [
         "VA-FI Deficit 4 of 30: Hypertension.",
-        "Prevalence: 80% \u2014 dominant comorbidity in dysvascular disease. (RESEARCHER_ADJUSTS)",
+        "Prevalence: 80% — dominant comorbidity in dysvascular disease. (RESEARCHER_ADJUSTS)",
         "ICD-10: I10, I11.x, I12.x, I13.x.",
         "NOTE: I11-I13 HTN combination codes are NOT descendants of the essential",
         "hypertension SNOMED ancestor in this vocab build. See covariate_concepts.csv",
-        "\u2014 concept IDs 316866, 442604, 201313, 195556 are all required."
+        "— concept IDs 316866, 442604, 201313, 195556 are all required."
       ],
       "distributed_transition": [
         {
@@ -364,16 +379,16 @@
     "Cov_HTN_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 38341003 'Hypertensive disorder, systemic arterial' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 38341003 'Hypertensive disorder, systemic arterial' [vocab query — 2026-07-05].",
         "Covers essential HTN (I10). HTN heart/renal combination codes (I11-I13)",
-        "are modelled as separate OMOP standard concepts \u2014 see covariate_concepts.csv.",
+        "are modelled as separate OMOP standard concepts — see covariate_concepts.csv.",
         "Verify: Rscript scripts/concept_lookup.R 'hypertension' Condition"
       ],
       "codes": [
         {
           "system": "SNOMED-CT",
           "code": "38341003",
-          "display": "Hypertensive disorder, systemic arterial [vocab query \u2014 2026-07-05]"
+          "display": "Hypertensive disorder, systemic arterial [vocab query — 2026-07-05]"
         }
       ],
       "direct_transition": "Cov_DM_Check"
@@ -381,12 +396,12 @@
     "Cov_DM_Check": {
       "type": "Simple",
       "remarks": [
-        "VA-FI Deficit 5 of 30: Diabetes mellitus \u2014 PVD-only patient supplement.",
+        "VA-FI Deficit 5 of 30: Diabetes mellitus — PVD-only patient supplement.",
         "DM is already recorded at cohort entry for PVD+DM (30%) and DM-only (40%)",
         "patients. This state adds DM as a comorbidity only for the 30% of PVD-only",
         "patients who have DM but not as the amputation indication.",
         "Synthea ConditionExists check: skip if DM already present from entry.",
-        "Net effective prevalence: ~60% of PVD-only patients \u2192 ~18% of total cohort",
+        "Net effective prevalence: ~60% of PVD-only patients → ~18% of total cohort",
         "develop DM here; remaining DM from entry states.",
         "RESEARCHER_ADJUSTS: tune distribution for PVD-only DM comorbidity rate."
       ],
@@ -412,7 +427,7 @@
     "Cov_DM_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 44054006 'Type 2 diabetes mellitus' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 44054006 'Type 2 diabetes mellitus' [vocab query — 2026-07-05].",
         "Type 2 dominates in this PAD population. Type 1 (E10.x) is rare.",
         "Verify: Rscript scripts/concept_lookup.R 'type 2 diabetes mellitus' Condition"
       ],
@@ -420,7 +435,7 @@
         {
           "system": "SNOMED-CT",
           "code": "44054006",
-          "display": "Type 2 diabetes mellitus [vocab query \u2014 OMOP 201826]"
+          "display": "Type 2 diabetes mellitus [vocab query — OMOP 201826]"
         }
       ],
       "direct_transition": "Cov_CKD_Check"
@@ -450,7 +465,7 @@
     "Cov_CKD_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 709044004 'Chronic kidney disease' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 709044004 'Chronic kidney disease' [vocab query — 2026-07-05].",
         "Covers N18.1-N18.9. Transplant/dialysis covered by Cov_KidneyProc_Onset.",
         "OR with Cov_KidneyProc_Onset = 1 VA-FI kidney deficit in workflow/08.",
         "Verify: Rscript scripts/concept_lookup.R 'chronic kidney disease' Condition"
@@ -459,7 +474,7 @@
         {
           "system": "SNOMED-CT",
           "code": "709044004",
-          "display": "Chronic kidney disease [vocab query \u2014 OMOP 46271022]"
+          "display": "Chronic kidney disease [vocab query — OMOP 46271022]"
         }
       ],
       "direct_transition": "Cov_KidneyProc_Check"
@@ -487,7 +502,7 @@
     "Cov_KidneyProc_Onset": {
       "type": "Procedure",
       "remarks": [
-        "SNOMED-CT 175899003 'Renal dialysis' [vocab query \u2014 2026-07-05] \u2014 covers Z99.2.",
+        "SNOMED-CT 175899003 'Renal dialysis' [vocab query — 2026-07-05] — covers Z99.2.",
         "State type is Procedure (not ConditionOnset) to match the OMOP domain:",
         "procedure_occurrence, consistent with vafi_kidney_procedure covariate.",
         "Kidney transplant (Z94.0) uses a separate concept in covariate_concepts.csv",
@@ -498,7 +513,7 @@
         {
           "system": "SNOMED-CT",
           "code": "265764009",
-          "display": "Renal dialysis [vocab query \u2014 OMOP 4146536]"
+          "display": "Renal dialysis [vocab query — OMOP 4146536]"
         }
       ],
       "duration": {
@@ -529,7 +544,7 @@
     "Cov_CVD_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 62914000 'Cerebrovascular disease' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 62914000 'Cerebrovascular disease' [vocab query — 2026-07-05].",
         "Broad ancestor covers I60-I67, TIA, late effects. See covariate_concepts.csv",
         "for additional concept IDs (381591, 43021377, 434056, 439847, 443454).",
         "Verify: Rscript scripts/concept_lookup.R 'cerebrovascular disease' Condition"
@@ -538,7 +553,7 @@
         {
           "system": "SNOMED-CT",
           "code": "62914000",
-          "display": "Cerebrovascular disease [vocab query \u2014 OMOP 381591]"
+          "display": "Cerebrovascular disease [vocab query — OMOP 381591]"
         }
       ],
       "direct_transition": "Cov_Cancer_Check"
@@ -563,7 +578,7 @@
     "Cov_Cancer_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 363346000 'Malignant neoplastic disease' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 363346000 'Malignant neoplastic disease' [vocab query — 2026-07-05].",
         "Broad ancestor covers all C-codes. Verify with vocab query.",
         "Verify: Rscript scripts/concept_lookup.R 'malignant neoplasm' Condition"
       ],
@@ -571,7 +586,7 @@
         {
           "system": "SNOMED-CT",
           "code": "363346000",
-          "display": "Malignant neoplastic disease [vocab query \u2014 OMOP 443392]"
+          "display": "Malignant neoplastic disease [vocab query — OMOP 443392]"
         }
       ],
       "direct_transition": "Cov_Liver_Check"
@@ -596,14 +611,14 @@
     "Cov_Liver_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 57773001 'Chronic liver disease' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 57773001 'Chronic liver disease' [vocab query — 2026-07-05].",
         "Verify: Rscript scripts/concept_lookup.R 'chronic liver disease' Condition"
       ],
       "codes": [
         {
           "system": "SNOMED-CT",
           "code": "328383001",
-          "display": "Chronic liver disease [vocab query \u2014 OMOP 4212540]"
+          "display": "Chronic liver disease [vocab query — OMOP 4212540]"
         }
       ],
       "direct_transition": "Cov_COPD_Check"
@@ -629,7 +644,7 @@
     "Cov_COPD_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 13645005 'Chronic obstructive lung disease' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 13645005 'Chronic obstructive lung disease' [vocab query — 2026-07-05].",
         "COPD is the dominant chronic lung phenotype in this population.",
         "Verify: Rscript scripts/concept_lookup.R 'chronic obstructive lung disease' Condition"
       ],
@@ -637,7 +652,7 @@
         {
           "system": "SNOMED-CT",
           "code": "13645005",
-          "display": "Chronic obstructive lung disease [vocab query \u2014 2026-07-05]"
+          "display": "Chronic obstructive lung disease [vocab query — 2026-07-05]"
         }
       ],
       "direct_transition": "Cov_Arthritis_Check"
@@ -662,7 +677,7 @@
     "Cov_Arthritis_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 396275006 'Osteoarthritis' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 396275006 'Osteoarthritis' [vocab query — 2026-07-05].",
         "Most common arthritis form in this age group. RA covered by a separate",
         "descendant in the OMOP concept ancestor tree.",
         "Verify: Rscript scripts/concept_lookup.R 'osteoarthritis' Condition"
@@ -671,7 +686,7 @@
         {
           "system": "SNOMED-CT",
           "code": "396275006",
-          "display": "Osteoarthritis [vocab query \u2014 OMOP 80180]"
+          "display": "Osteoarthritis [vocab query — OMOP 80180]"
         }
       ],
       "direct_transition": "Cov_Osteoporosis_Check"
@@ -696,14 +711,14 @@
     "Cov_Osteoporosis_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 64859006 'Osteoporosis' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 64859006 'Osteoporosis' [vocab query — 2026-07-05].",
         "Verify: Rscript scripts/concept_lookup.R 'osteoporosis' Condition"
       ],
       "codes": [
         {
           "system": "SNOMED-CT",
           "code": "64859006",
-          "display": "Osteoporosis [vocab query \u2014 OMOP 80502]"
+          "display": "Osteoporosis [vocab query — OMOP 80502]"
         }
       ],
       "direct_transition": "Cov_Gait_Check"
@@ -713,7 +728,7 @@
       "remarks": [
         "VA-FI Deficit 14 of 30: Gait abnormality.",
         "Prevalence: 30%. ICD-10: R26.x (Observation domain in OMOP).",
-        "Also includes R27.x (lack of coordination \u2192 ataxia, Condition domain).",
+        "Also includes R27.x (lack of coordination → ataxia, Condition domain).",
         "Cov_GaitAtaxia_Onset is an additional OR pair for the same deficit. (RESEARCHER_ADJUSTS)"
       ],
       "distributed_transition": [
@@ -730,7 +745,7 @@
     "Cov_Gait_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 22325002 'Abnormal gait' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 22325002 'Abnormal gait' [vocab query — 2026-07-05].",
         "Maps to Observation domain in OMOP (R26.x ICD-10).",
         "Synthea ConditionOnset is used; ETL routes to observation_occurrence.",
         "Verify: Rscript scripts/concept_lookup.R 'abnormal gait' Condition",
@@ -740,7 +755,7 @@
         {
           "system": "SNOMED-CT",
           "code": "22325002",
-          "display": "Abnormal gait [vocab query \u2014 OMOP 318099]"
+          "display": "Abnormal gait [vocab query — OMOP 318099]"
         }
       ],
       "direct_transition": "Cov_GaitAtaxia_Check"
@@ -768,15 +783,15 @@
     "Cov_GaitAtaxia_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 20262006 'Ataxia' [vocab query \u2014 2026-07-05].",
-        "Condition domain in OMOP (R27.x \u2192 G11.x / other ataxia SNOMED).",
+        "SNOMED-CT 20262006 'Ataxia' [vocab query — 2026-07-05].",
+        "Condition domain in OMOP (R27.x → G11.x / other ataxia SNOMED).",
         "Verify: Rscript scripts/concept_lookup.R 'ataxia' Condition"
       ],
       "codes": [
         {
           "system": "SNOMED-CT",
           "code": "20262006",
-          "display": "Ataxia [vocab query \u2014 OMOP 376337]"
+          "display": "Ataxia [vocab query — OMOP 376337]"
         }
       ],
       "direct_transition": "Cov_Falls_Check"
@@ -803,7 +818,7 @@
     "Cov_Falls_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 161898004 'Falls' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 161898004 'Falls' [vocab query — 2026-07-05].",
         "Maps to Observation domain in OMOP (Z91.81 history of falls).",
         "Verify: Rscript scripts/concept_lookup.R 'history of falls' Observation"
       ],
@@ -811,7 +826,7 @@
         {
           "system": "SNOMED-CT",
           "code": "161898004",
-          "display": "Falls [vocab query \u2014 OMOP 443596]"
+          "display": "Falls [vocab query — OMOP 443596]"
         }
       ],
       "direct_transition": "Cov_FallInjury_Check"
@@ -819,7 +834,7 @@
     "Cov_FallInjury_Check": {
       "type": "Simple",
       "remarks": [
-        "VA-FI Falls supplement: fracture/injury codes (S/M84.x \u2192 Condition domain).",
+        "VA-FI Falls supplement: fracture/injury codes (S/M84.x → Condition domain).",
         "~30% of fall-deficit patients have a documented fracture/injury code.",
         "RESEARCHER_ADJUSTS: tune based on coding patterns.",
         "OR'd with Cov_Falls_Onset = 1 VA-FI deficit in workflow/08."
@@ -838,7 +853,7 @@
     "Cov_FallInjury_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 125592003 'Injury caused by fall' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 125592003 'Injury caused by fall' [vocab query — 2026-07-05].",
         "Condition domain in OMOP (S/M84.x fracture/injury codes).",
         "Verify: Rscript scripts/concept_lookup.R 'injury caused by fall' Condition"
       ],
@@ -846,7 +861,7 @@
         {
           "system": "SNOMED-CT",
           "code": "398117008",
-          "display": "Falling injury [vocab query \u2014 OMOP 432787]"
+          "display": "Falling injury [vocab query — OMOP 432787]"
         }
       ],
       "direct_transition": "Cov_Neuropathy_Check"
@@ -855,7 +870,7 @@
       "type": "Simple",
       "remarks": [
         "VA-FI Deficit 16 of 30: Peripheral neuropathy.",
-        "Prevalence: 30% \u2014 high in diabetic PAD population. (RESEARCHER_ADJUSTS)",
+        "Prevalence: 30% — high in diabetic PAD population. (RESEARCHER_ADJUSTS)",
         "ICD-10: G60-G63."
       ],
       "distributed_transition": [
@@ -872,14 +887,14 @@
     "Cov_Neuropathy_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 302226006 'Peripheral neuropathy' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 302226006 'Peripheral neuropathy' [vocab query — 2026-07-05].",
         "Verify: Rscript scripts/concept_lookup.R 'peripheral neuropathy' Condition"
       ],
       "codes": [
         {
           "system": "SNOMED-CT",
           "code": "302226006",
-          "display": "Peripheral neuropathy [vocab query \u2014 2026-07-05]"
+          "display": "Peripheral neuropathy [vocab query — 2026-07-05]"
         }
       ],
       "direct_transition": "Cov_Dementia_Check"
@@ -904,7 +919,7 @@
     "Cov_Dementia_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 52448006 'Dementia' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 52448006 'Dementia' [vocab query — 2026-07-05].",
         "Covers Alzheimer's, vascular dementia (443605), and other F03.x.",
         "Verify: Rscript scripts/concept_lookup.R 'dementia' Condition"
       ],
@@ -912,7 +927,7 @@
         {
           "system": "SNOMED-CT",
           "code": "52448006",
-          "display": "Dementia [vocab query \u2014 OMOP 372610]"
+          "display": "Dementia [vocab query — OMOP 372610]"
         }
       ],
       "direct_transition": "Cov_Depression_Check"
@@ -937,7 +952,7 @@
     "Cov_Depression_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 35489007 'Depressive disorder' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 35489007 'Depressive disorder' [vocab query — 2026-07-05].",
         "Covers major depression (F32-F33) and dysthymia (433440) per covariate_concepts.csv.",
         "Verify: Rscript scripts/concept_lookup.R 'depressive disorder' Condition"
       ],
@@ -945,7 +960,7 @@
         {
           "system": "SNOMED-CT",
           "code": "35489007",
-          "display": "Depressive disorder [vocab query \u2014 OMOP 440383]"
+          "display": "Depressive disorder [vocab query — OMOP 440383]"
         }
       ],
       "direct_transition": "Cov_Anxiety_Check"
@@ -970,7 +985,7 @@
     "Cov_Anxiety_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 197480006 'Anxiety disorder' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 197480006 'Anxiety disorder' [vocab query — 2026-07-05].",
         "Covers F40-F41, PTSD (443414), adjustment disorder (436677) per covariate_concepts.csv.",
         "Verify: Rscript scripts/concept_lookup.R 'anxiety disorder' Condition"
       ],
@@ -978,7 +993,7 @@
         {
           "system": "SNOMED-CT",
           "code": "197480006",
-          "display": "Anxiety disorder [vocab query \u2014 OMOP 441542]"
+          "display": "Anxiety disorder [vocab query — OMOP 441542]"
         }
       ],
       "direct_transition": "Cov_Parkinsons_Check"
@@ -1003,14 +1018,14 @@
     "Cov_Parkinsons_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 49049000 'Parkinson's disease' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 49049000 'Parkinson's disease' [vocab query — 2026-07-05].",
         "Verify: Rscript scripts/concept_lookup.R 'parkinson disease' Condition"
       ],
       "codes": [
         {
           "system": "SNOMED-CT",
           "code": "49049000",
-          "display": "Parkinson's disease [vocab query \u2014 2026-07-05]"
+          "display": "Parkinson's disease [vocab query — 2026-07-05]"
         }
       ],
       "direct_transition": "Cov_Anemia_Check"
@@ -1035,14 +1050,14 @@
     "Cov_Anemia_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 271737000 'Anemia' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 271737000 'Anemia' [vocab query — 2026-07-05].",
         "Verify: Rscript scripts/concept_lookup.R 'anemia' Condition"
       ],
       "codes": [
         {
           "system": "SNOMED-CT",
           "code": "271737000",
-          "display": "Anemia [vocab query \u2014 OMOP 439777]"
+          "display": "Anemia [vocab query — OMOP 439777]"
         }
       ],
       "direct_transition": "Cov_Thyroid_Check"
@@ -1067,7 +1082,7 @@
     "Cov_Thyroid_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 40930008 'Hypothyroidism' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 40930008 'Hypothyroidism' [vocab query — 2026-07-05].",
         "Hypothyroidism accounts for ~80% of thyroid disease in this age group.",
         "Verify: Rscript scripts/concept_lookup.R 'hypothyroidism' Condition"
       ],
@@ -1075,7 +1090,7 @@
         {
           "system": "SNOMED-CT",
           "code": "40930008",
-          "display": "Hypothyroidism [vocab query \u2014 OMOP 140673]"
+          "display": "Hypothyroidism [vocab query — OMOP 140673]"
         }
       ],
       "direct_transition": "Cov_Incontinence_Check"
@@ -1100,14 +1115,14 @@
     "Cov_Incontinence_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 165232002 'Urinary incontinence' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 165232002 'Urinary incontinence' [vocab query — 2026-07-05].",
         "Verify: Rscript scripts/concept_lookup.R 'urinary incontinence' Condition"
       ],
       "codes": [
         {
           "system": "SNOMED-CT",
           "code": "165232002",
-          "display": "Urinary incontinence [vocab query \u2014 OMOP 192671]"
+          "display": "Urinary incontinence [vocab query — OMOP 192671]"
         }
       ],
       "direct_transition": "Cov_Cachexia_Check"
@@ -1116,7 +1131,7 @@
       "type": "Simple",
       "remarks": [
         "VA-FI Deficit 24 of 30: Muscle wasting / cachexia.",
-        "Prevalence: 40% \u2014 high in this comorbid surgical population. (RESEARCHER_ADJUSTS)",
+        "Prevalence: 40% — high in this comorbid surgical population. (RESEARCHER_ADJUSTS)",
         "ICD-10: M62.5x (muscle wasting), R64 (cachexia), E41 (marasmus)."
       ],
       "distributed_transition": [
@@ -1133,7 +1148,7 @@
     "Cov_Cachexia_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 238131007 'Muscle wasting' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 238131007 'Muscle wasting' [vocab query — 2026-07-05].",
         "M62.5x codes map to this SNOMED concept; R64 cachexia and E41 marasmus",
         "are additional concepts in covariate_concepts.csv (78236 muscle atrophy).",
         "Verify: Rscript scripts/concept_lookup.R 'muscle wasting' Condition"
@@ -1142,7 +1157,7 @@
         {
           "system": "SNOMED-CT",
           "code": "88092000",
-          "display": "Muscle atrophy [vocab query \u2014 OMOP 78236]"
+          "display": "Muscle atrophy [vocab query — OMOP 78236]"
         }
       ],
       "direct_transition": "Cov_Vision_Check"
@@ -1151,7 +1166,7 @@
       "type": "Simple",
       "remarks": [
         "VA-FI Deficit 25 of 30: Vision impairment.",
-        "Prevalence: 30% \u2014 includes diabetic retinopathy, cataracts, glaucoma. (RESEARCHER_ADJUSTS)",
+        "Prevalence: 30% — includes diabetic retinopathy, cataracts, glaucoma. (RESEARCHER_ADJUSTS)",
         "ICD-10: H25-H26 (cataracts), H35.x (retinal), H54.x (impairment), H40.x (glaucoma)."
       ],
       "distributed_transition": [
@@ -1168,7 +1183,7 @@
     "Cov_Vision_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 397540003 'Visual impairment' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 397540003 'Visual impairment' [vocab query — 2026-07-05].",
         "Broad ancestor covers H35, H54, cataracts, glaucoma.",
         "Additional concept IDs in covariate_concepts.csv: 378416 (retinal disorder).",
         "Verify: Rscript scripts/concept_lookup.R 'visual impairment' Condition"
@@ -1177,7 +1192,7 @@
         {
           "system": "SNOMED-CT",
           "code": "397540003",
-          "display": "Visual impairment [vocab query \u2014 OMOP 379806]"
+          "display": "Visual impairment [vocab query — OMOP 379806]"
         }
       ],
       "direct_transition": "Cov_Hearing_Check"
@@ -1202,14 +1217,14 @@
     "Cov_Hearing_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 15188001 'Hearing loss' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 15188001 'Hearing loss' [vocab query — 2026-07-05].",
         "Verify: Rscript scripts/concept_lookup.R 'hearing loss' Condition"
       ],
       "codes": [
         {
           "system": "SNOMED-CT",
           "code": "15188001",
-          "display": "Hearing loss [vocab query \u2014 OMOP 374375]"
+          "display": "Hearing loss [vocab query — OMOP 374375]"
         }
       ],
       "direct_transition": "Cov_WeightLoss_Check"
@@ -1234,7 +1249,7 @@
     "Cov_WeightLoss_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 89362005 'Weight loss' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 89362005 'Weight loss' [vocab query — 2026-07-05].",
         "Maps to Observation domain in OMOP (R63.4 / R63.6 ICD-10).",
         "Verify: Rscript scripts/concept_lookup.R 'weight loss' Observation"
       ],
@@ -1242,7 +1257,7 @@
         {
           "system": "SNOMED-CT",
           "code": "448765001",
-          "display": "Unintentional weight loss [vocab query \u2014 OMOP 40491502]"
+          "display": "Unintentional weight loss [vocab query — OMOP 40491502]"
         }
       ],
       "direct_transition": "Cov_ChronicPain_Check"
@@ -1267,14 +1282,14 @@
     "Cov_ChronicPain_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 82423001 'Chronic pain' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 82423001 'Chronic pain' [vocab query — 2026-07-05].",
         "Verify: Rscript scripts/concept_lookup.R 'chronic pain' Condition"
       ],
       "codes": [
         {
           "system": "SNOMED-CT",
           "code": "82423001",
-          "display": "Chronic pain [vocab query \u2014 OMOP 4281516]"
+          "display": "Chronic pain [vocab query — OMOP 4281516]"
         }
       ],
       "direct_transition": "Cov_FTT_Check"
@@ -1299,14 +1314,14 @@
     "Cov_FTT_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 109588007 'Failure to thrive' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 109588007 'Failure to thrive' [vocab query — 2026-07-05].",
         "Verify: Rscript scripts/concept_lookup.R 'failure to thrive' Condition"
       ],
       "codes": [
         {
           "system": "SNOMED-CT",
           "code": "54840006",
-          "display": "Failure to thrive [vocab query \u2014 OMOP 437986]"
+          "display": "Failure to thrive [vocab query — OMOP 437986]"
         }
       ],
       "direct_transition": "Cov_Fatigue_Check"
@@ -1332,7 +1347,7 @@
     "Cov_Fatigue_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 84229001 'Fatigue' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 84229001 'Fatigue' [vocab query — 2026-07-05].",
         "Maps to Observation domain in OMOP (R53.x ICD-10).",
         "Verify: Rscript scripts/concept_lookup.R 'fatigue' Observation"
       ],
@@ -1340,7 +1355,7 @@
         {
           "system": "SNOMED-CT",
           "code": "84229001",
-          "display": "Fatigue [vocab query \u2014 OMOP 4079541]"
+          "display": "Fatigue [vocab query — OMOP 4079541]"
         }
       ],
       "direct_transition": "Cov_TissueLoss_Check"
@@ -1387,14 +1402,14 @@
     "Cov_TissueLoss_Ulcer": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 13954005 'Ischemic ulcer' -> OMOP 4029926 (Condition) [vocab query \u2014 2026-08-02].",
+        "SNOMED-CT 13954005 'Ischemic ulcer' -> OMOP 4029926 (Condition) [vocab query — 2026-08-02].",
         "covariate_concepts.csv :: tissue_loss, include_descendants = TRUE."
       ],
       "codes": [
         {
           "system": "SNOMED-CT",
           "code": "13954005",
-          "display": "Ischemic ulcer [vocab query \u2014 OMOP 4029926]"
+          "display": "Ischemic ulcer [vocab query — OMOP 4029926]"
         }
       ],
       "direct_transition": "Cov_PAOD_Check"
@@ -1402,14 +1417,14 @@
     "Cov_TissueLoss_Gangrene": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 402861007 'Ischemic gangrene' -> OMOP 4291464 (Condition) [vocab query \u2014 2026-08-02].",
+        "SNOMED-CT 402861007 'Ischemic gangrene' -> OMOP 4291464 (Condition) [vocab query — 2026-08-02].",
         "covariate_concepts.csv :: tissue_loss, include_descendants = TRUE."
       ],
       "codes": [
         {
           "system": "SNOMED-CT",
           "code": "402861007",
-          "display": "Ischemic gangrene [vocab query \u2014 OMOP 4291464]"
+          "display": "Ischemic gangrene [vocab query — OMOP 4291464]"
         }
       ],
       "direct_transition": "Cov_PAOD_Check"
@@ -1424,7 +1439,7 @@
         "maps to OMOP 321052, which is an ANCESTOR of 317309 two levels up, not a",
         "descendant. covariate_concepts_vqifs.csv rolls pvd up from 317309, so the",
         "existing states contributed NOTHING and pvd measured 0 of 379.",
-        "Confirmed against concept_ancestor [vocab query \u2014 2026-08-02].",
+        "Confirmed against concept_ancestor [vocab query — 2026-08-02].",
         "",
         "Prevalence 85%: PAD is a target-cohort eligibility indication, so a",
         "diagnosis-based PVD item activates near-universally by construction."
@@ -1443,14 +1458,14 @@
     "Cov_PAOD_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 399957001 'Peripheral arterial occlusive disease' -> OMOP 317309 [vocab query \u2014 2026-08-02].",
+        "SNOMED-CT 399957001 'Peripheral arterial occlusive disease' -> OMOP 317309 [vocab query — 2026-08-02].",
         "This is the exact rollup ancestor covariate_concepts_vqifs.csv uses for pvd."
       ],
       "codes": [
         {
           "system": "SNOMED-CT",
           "code": "399957001",
-          "display": "Peripheral arterial occlusive disease [vocab query \u2014 OMOP 317309]"
+          "display": "Peripheral arterial occlusive disease [vocab query — OMOP 317309]"
         }
       ],
       "direct_transition": "Cov_FuncStatus_Check"
@@ -1484,7 +1499,7 @@
     "Cov_ImpairedMobility_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 82971005 'Impaired mobility' -> OMOP 4306934 (Observation) [vocab query \u2014 2026-08-02].",
+        "SNOMED-CT 82971005 'Impaired mobility' -> OMOP 4306934 (Observation) [vocab query — 2026-08-02].",
         "covariate_concepts_mfi5.csv :: fs_dep.",
         "Falls through to the Frailty state - both are emitted, see the gate remarks."
       ],
@@ -1492,7 +1507,7 @@
         {
           "system": "SNOMED-CT",
           "code": "82971005",
-          "display": "Impaired mobility [vocab query \u2014 OMOP 4306934]"
+          "display": "Impaired mobility [vocab query — OMOP 4306934]"
         }
       ],
       "direct_transition": "Cov_Frailty_Onset"
@@ -1500,7 +1515,7 @@
     "Cov_Frailty_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 248279007 'Frailty' -> OMOP 4086506 (Condition) [vocab query \u2014 2026-08-02].",
+        "SNOMED-CT 248279007 'Frailty' -> OMOP 4086506 (Condition) [vocab query — 2026-08-02].",
         "covariate_concepts_mfi5.csv :: fs_dep. Condition domain, unlike its",
         "Observation-domain partner above."
       ],
@@ -1508,7 +1523,7 @@
         {
           "system": "SNOMED-CT",
           "code": "248279007",
-          "display": "Frailty [vocab query \u2014 OMOP 4086506]"
+          "display": "Frailty [vocab query — OMOP 4086506]"
         }
       ],
       "direct_transition": "Cov_AmbuAid_Check"
@@ -1538,7 +1553,7 @@
     "Cov_WalkingAid_Onset": {
       "type": "Observation",
       "remarks": [
-        "SNOMED-CT 165251008 'Walking aid use' -> OMOP 4012645 (Observation) [vocab query \u2014 2026-08-02].",
+        "SNOMED-CT 165251008 'Walking aid use' -> OMOP 4012645 (Observation) [vocab query — 2026-08-02].",
         "covariate_concepts.csv :: ambu_deficit, include_descendants = TRUE.",
         "Emitted as an Observation state (not ConditionOnset) so it lands in the",
         "observation table, matching the concept's OMOP domain."
@@ -1548,7 +1563,7 @@
         {
           "system": "SNOMED-CT",
           "code": "165251008",
-          "display": "Walking aid use [vocab query \u2014 OMOP 4012645]"
+          "display": "Walking aid use [vocab query — OMOP 4012645]"
         }
       ],
       "direct_transition": "Cov_Wheelchair_Check"
@@ -1579,7 +1594,7 @@
     "Cov_Wheelchair_Device": {
       "type": "Device",
       "remarks": [
-        "SNOMED-CT 58938008 'Wheelchair' -> OMOP 4240470 (Device domain) [vocab query \u2014 2026-08-02].",
+        "SNOMED-CT 58938008 'Wheelchair' -> OMOP 4240470 (Device domain) [vocab query — 2026-08-02].",
         "covariate_concepts.csv :: ambu_deficit, include_descendants = FALSE - so",
         "the EXACT ancestor code must be emitted. Descendants such as 4045112",
         "Manual wheelchair already exist in this CDM from stock Synthea but do not",
@@ -1588,7 +1603,7 @@
       "code": {
         "system": "SNOMED-CT",
         "code": "58938008",
-        "display": "Wheelchair [vocab query \u2014 OMOP 4240470]"
+        "display": "Wheelchair [vocab query — OMOP 4240470]"
       },
       "direct_transition": "Cov_Insulin_Check"
     },
@@ -1615,15 +1630,15 @@
     "Cov_Insulin_Order": {
       "type": "MedicationOrder",
       "remarks": [
-        "RxNorm 274783 'insulin glargine' -> OMOP 1502905 (Drug) [vocab query \u2014 2026-08-02].",
-        "Verified descendant of ATC 21600713 'INSULINS AND ANALOGUES' [vocab query \u2014 2026-08-02], which",
+        "RxNorm 274783 'insulin glargine' -> OMOP 1502905 (Drug) [vocab query — 2026-08-02].",
+        "Verified descendant of ATC 21600713 'INSULINS AND ANALOGUES' [vocab query — 2026-08-02], which",
         "is the rollup ancestor covariate_concepts.csv uses for insulin_dep."
       ],
       "codes": [
         {
           "system": "RxNorm",
           "code": "274783",
-          "display": "insulin glargine [vocab query \u2014 OMOP 1502905]"
+          "display": "insulin glargine [vocab query — OMOP 1502905]"
         }
       ],
       "dosage": {
@@ -1662,7 +1677,7 @@
     },
     "Non_Exposed_Path_End": {
       "type": "EncounterEnd",
-      "direct_transition": "Terminal"
+      "direct_transition": "Index_Attributes_Guard"
     },
     "Target_Exposed_Path_End": {
       "type": "EncounterEnd",
@@ -1675,7 +1690,7 @@
       "type": "Delay",
       "remarks": [
         "Time from outpatient evaluation to amputation.",
-        "Range: 7-90 days \u2014 reflects urgent/semi-elective limb-threatening ischemia.",
+        "Range: 7-90 days — reflects urgent/semi-elective limb-threatening ischemia.",
         "Truly emergent cases (acute limb ischemia) would be 0-2 days.",
         "RESEARCHER_ADJUSTS: narrow to 0-7 for emergency presentation cohort.",
         "Narrowed 7-90 -> 7-60 days on 2026-08-02 so that adding the 1-30 day",
@@ -1709,7 +1724,7 @@
         "comorbidity onsets into one month or breaking the documented 7-90 day",
         "urgent/semi-elective workup interval.",
         "",
-        "SNOMED-CT 185349003 'Encounter for check up' -> OMOP 4085799 [vocab query \u2014 2026-08-02]; the",
+        "SNOMED-CT 185349003 'Encounter for check up' -> OMOP 4085799 [vocab query — 2026-08-02]; the",
         "OMOP visit_concept_id comes from encounter_class 'outpatient', not from",
         "this code - the same pattern Index_Diagnosis_Encounter already uses."
       ],
@@ -1718,7 +1733,7 @@
         {
           "system": "SNOMED-CT",
           "code": "185349003",
-          "display": "Encounter for check up [vocab query \u2014 OMOP 4085799]"
+          "display": "Encounter for check up [vocab query — OMOP 4085799]"
         }
       ],
       "reason": "exposure_condition",
@@ -1751,7 +1766,7 @@
     "Cov_CHF_Recent_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "SNOMED-CT 84114007 'Heart failure' -> OMOP 316139 (Condition) [vocab query \u2014 2026-08-02].",
+        "SNOMED-CT 84114007 'Heart failure' -> OMOP 316139 (Condition) [vocab query — 2026-08-02].",
         "Same concept as Cov_CHF_Onset - deliberately a repeat record, not a new",
         "concept, so both the mFI-5 and sVQI-FS chf items resolve from one code."
       ],
@@ -1759,7 +1774,7 @@
         {
           "system": "SNOMED-CT",
           "code": "84114007",
-          "display": "Heart failure [vocab query \u2014 OMOP 316139]"
+          "display": "Heart failure [vocab query — OMOP 316139]"
         }
       ],
       "direct_transition": "Cov_Hgb_Check"
@@ -1795,7 +1810,7 @@
     "Cov_Hgb_Low": {
       "type": "Observation",
       "remarks": [
-        "LOINC 718-7 'Hemoglobin [Mass/volume] in Blood' -> OMOP 3000963 [vocab query \u2014 2026-08-02].",
+        "LOINC 718-7 'Hemoglobin [Mass/volume] in Blood' -> OMOP 3000963 [vocab query — 2026-08-02].",
         "5.5-9.9 g/dL: below the Iannuzzi 10 g/dL threshold and below both",
         "sex-specific Kraiss thresholds.",
         "Unit string 'g/dL' matches what stock Synthea already round-trips through",
@@ -1807,7 +1822,7 @@
         {
           "system": "LOINC",
           "code": "718-7",
-          "display": "Hemoglobin [Mass/volume] in Blood [vocab query \u2014 OMOP 3000963]"
+          "display": "Hemoglobin [Mass/volume] in Blood [vocab query — OMOP 3000963]"
         }
       ],
       "range": {
@@ -1820,7 +1835,7 @@
     "Cov_Hgb_Normal": {
       "type": "Observation",
       "remarks": [
-        "LOINC 718-7 -> OMOP 3000963 [vocab query \u2014 2026-08-02]. Normal-range arm, 10.0-17.0 g/dL.",
+        "LOINC 718-7 -> OMOP 3000963 [vocab query — 2026-08-02]. Normal-range arm, 10.0-17.0 g/dL.",
         "Above the Iannuzzi threshold; the lower part of this range still trips the",
         "sex-specific Kraiss threshold (< 13 male / < 12 female), which is intended."
       ],
@@ -1829,7 +1844,7 @@
         {
           "system": "LOINC",
           "code": "718-7",
-          "display": "Hemoglobin [Mass/volume] in Blood [vocab query \u2014 OMOP 3000963]"
+          "display": "Hemoglobin [Mass/volume] in Blood [vocab query — OMOP 3000963]"
         }
       ],
       "range": {
@@ -1866,7 +1881,7 @@
     "Cov_Creatinine_High": {
       "type": "Observation",
       "remarks": [
-        "LOINC 2160-0 'Creatinine [Mass/volume] in Serum or Plasma' -> OMOP 3016723 [vocab query \u2014 2026-08-02].",
+        "LOINC 2160-0 'Creatinine [Mass/volume] in Serum or Plasma' -> OMOP 3016723 [vocab query — 2026-08-02].",
         "1.9-4.5 mg/dL: above the 1.8 mg/dL threshold in",
         "query_renal_impairment_covariate_counts(), and clinically plausible for",
         "CKD stage 3-4 without dialysis.",
@@ -1877,7 +1892,7 @@
         {
           "system": "LOINC",
           "code": "2160-0",
-          "display": "Creatinine [Mass/volume] in Serum or Plasma [vocab query \u2014 OMOP 3016723]"
+          "display": "Creatinine [Mass/volume] in Serum or Plasma [vocab query — OMOP 3016723]"
         }
       ],
       "range": {
@@ -1890,7 +1905,7 @@
     "Cov_Creatinine_Normal": {
       "type": "Observation",
       "remarks": [
-        "LOINC 2160-0 -> OMOP 3016723 [vocab query \u2014 2026-08-02]. Normal-range arm, 0.6-1.4 mg/dL,",
+        "LOINC 2160-0 -> OMOP 3016723 [vocab query — 2026-08-02]. Normal-range arm, 0.6-1.4 mg/dL,",
         "safely below the 1.8 mg/dL threshold."
       ],
       "category": "laboratory",
@@ -1898,7 +1913,7 @@
         {
           "system": "LOINC",
           "code": "2160-0",
-          "display": "Creatinine [Mass/volume] in Serum or Plasma [vocab query \u2014 OMOP 3016723]"
+          "display": "Creatinine [Mass/volume] in Serum or Plasma [vocab query — OMOP 3016723]"
         }
       ],
       "range": {
@@ -1940,7 +1955,7 @@
     "Cov_BMI_Underweight": {
       "type": "Observation",
       "remarks": [
-        "LOINC 39156-5 'Body mass index (BMI) [Ratio]' -> OMOP 3038553 [vocab query \u2014 2026-08-02].",
+        "LOINC 39156-5 'Body mass index (BMI) [Ratio]' -> OMOP 3038553 [vocab query — 2026-08-02].",
         "14.5-18.2 kg/m2, entirely below the 18.5 threshold."
       ],
       "category": "laboratory",
@@ -1948,7 +1963,7 @@
         {
           "system": "LOINC",
           "code": "39156-5",
-          "display": "Body mass index (BMI) [Ratio] [vocab query \u2014 OMOP 3038553]"
+          "display": "Body mass index (BMI) [Ratio] [vocab query — OMOP 3038553]"
         }
       ],
       "range": {
@@ -1961,7 +1976,7 @@
     "Cov_Weight_Low": {
       "type": "Observation",
       "remarks": [
-        "LOINC 29463-7 'Body weight' -> OMOP 3025315 (Measurement) [vocab query \u2014 2026-08-02].",
+        "LOINC 29463-7 'Body weight' -> OMOP 3025315 (Measurement) [vocab query — 2026-08-02].",
         "38-50 kg, consistent with the low BMI above so the tier-2 weight/height",
         "fallback in query_bmi_covariate_counts() reaches the same conclusion.",
         "Unit 'kg' -> unit_concept_id 9529."
@@ -1971,7 +1986,7 @@
         {
           "system": "LOINC",
           "code": "29463-7",
-          "display": "Body weight [vocab query \u2014 OMOP 3025315]"
+          "display": "Body weight [vocab query — OMOP 3025315]"
         }
       ],
       "range": {
@@ -1984,7 +1999,7 @@
     "Cov_BMI_Normal": {
       "type": "Observation",
       "remarks": [
-        "LOINC 39156-5 -> OMOP 3038553 [vocab query \u2014 2026-08-02]. Normal/overweight arm, 19.0-32.0 kg/m2.",
+        "LOINC 39156-5 -> OMOP 3038553 [vocab query — 2026-08-02]. Normal/overweight arm, 19.0-32.0 kg/m2.",
         "Measuring everyone mirrors a real preoperative clearance and keeps the most",
         "recent direct BMI inside the scoring window for the whole cohort."
       ],
@@ -1993,7 +2008,7 @@
         {
           "system": "LOINC",
           "code": "39156-5",
-          "display": "Body mass index (BMI) [Ratio] [vocab query \u2014 OMOP 3038553]"
+          "display": "Body mass index (BMI) [Ratio] [vocab query — OMOP 3038553]"
         }
       ],
       "range": {
@@ -2006,7 +2021,7 @@
     "Cov_Height_Preop": {
       "type": "Observation",
       "remarks": [
-        "LOINC 8302-2 'Body height' -> OMOP 3036277 (Measurement) [vocab query \u2014 2026-08-02].",
+        "LOINC 8302-2 'Body height' -> OMOP 3036277 (Measurement) [vocab query — 2026-08-02].",
         "155-180 cm. Needed by the tier-2 computed-BMI fallback",
         "(weight_kg / height_m^2) in query_bmi_covariate_counts().",
         "Unit 'cm' -> unit_concept_id 8582."
@@ -2016,7 +2031,7 @@
         {
           "system": "LOINC",
           "code": "8302-2",
-          "display": "Body height [vocab query \u2014 OMOP 3036277]"
+          "display": "Body height [vocab query — OMOP 3036277]"
         }
       ],
       "range": {
@@ -2054,9 +2069,9 @@
       "type": "Encounter",
       "remarks": [
         "Inpatient admission for major lower extremity amputation.",
-        "visit_concept_id = 9201 (inpatient visit) in OMOP \u2014 matches",
+        "visit_concept_id = 9201 (inpatient visit) in OMOP — matches",
         "study_params.yaml > target > visit_concept_ids.",
-        "SNOMED-CT 32485007 'Hospital admission' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 32485007 'Hospital admission' [vocab query — 2026-07-05].",
         "Verify: Rscript scripts/concept_lookup.R 'hospital admission' Visit"
       ],
       "encounter_class": "inpatient",
@@ -2064,89 +2079,11 @@
         {
           "system": "SNOMED-CT",
           "code": "32485007",
-          "display": "Hospital admission [vocab query \u2014 OMOP 9201]"
+          "display": "Hospital admission [vocab query — OMOP 9201]"
         }
       ],
       "reason": "exposure_condition",
-      "direct_transition": "Index_Procedure_Branch"
-    },
-    "Index_Procedure_Branch": {
-      "type": "Simple",
-      "remarks": [
-        "INDEX AMPUTATION LEVEL - added 2026-08-02.",
-        "Previously the module emitted only BKA, so every amputation-level covariate",
-        "downstream saw a constant.",
-        "40% AKA / 60% BKA approximates the observed mix in dysvascular major",
-        "amputation series. (RESEARCHER_ADJUSTS)",
-        "",
-        "Safe against pad-amp-ed-desc's readmission cohort (1797945): its exclusion",
-        "concept set '[DVI] Major Lower Extremity Amputation' already contains 4195136,",
-        "so AKA index stays are excluded from readmissions exactly as BKA stays are.",
-        "Verified against inst/cohorts/1797945.json on 2026-08-02."
-      ],
-      "distributed_transition": [
-        {
-          "distribution": 0.4,
-          "transition": "Index_Procedure_AKA"
-        },
-        {
-          "distribution": 0.6,
-          "transition": "Index_Procedure"
-        }
-      ]
-    },
-    "Index_Procedure_AKA": {
-      "type": "Procedure",
-      "remarks": [
-        "Index major lower extremity amputation - ABOVE-KNEE arm.",
-        "SNOMED-CT 79733001 'Amputation above-knee' -> OMOP 4195136 (Procedure) [vocab query \u2014 2026-08-02].",
-        "Listed in study_params.yaml > target > index_event > ancestor_concept_ids,",
-        "so it qualifies for the target cohort identically to the BKA code.",
-        "Duration 120-210 min - AKA runs somewhat longer than BKA."
-      ],
-      "codes": [
-        {
-          "system": "SNOMED-CT",
-          "code": "79733001",
-          "display": "Amputation above-knee [vocab query \u2014 OMOP 4195136]"
-        }
-      ],
-      "duration": {
-        "low": 120,
-        "high": 210,
-        "unit": "minutes"
-      },
-      "direct_transition": "Post_Index_Inpatient_Delay"
-    },
-    "Index_Procedure": {
-      "type": "Procedure",
-      "remarks": [
-        "Index major lower extremity amputation - BELOW-KNEE arm.",
-        "SNOMED-CT 88312006 'Amputation of leg through tibia and fibula' -> OMOP 4338257 [vocab query \u2014 2026-08-02].",
-        "",
-        "CORRECTED 2026-08-02: the previous remarks named this code as SNOMED",
-        "79733001 'Below-knee amputation' and claimed a single state covered every",
-        "amputation level. Neither was true - 79733001 is Amputation ABOVE-knee",
-        "(OMOP 4195136), and only this one BKA code was ever emitted, so the",
-        "amputation-level covariates in pad-amp-ed-desc had no signal to distinguish.",
-        "The former remark also mislabelled 4195136 as 'foot' and 4143795 as",
-        "'above knee'; correct names are above-knee and through-knee respectively.",
-        "",
-        "Duration 90-180 min (typical major amputation operative time)."
-      ],
-      "codes": [
-        {
-          "system": "SNOMED-CT",
-          "code": "88312006",
-          "display": "Amputation of leg through tibia and fibula [vocab query \u2014 OMOP 4338257]"
-        }
-      ],
-      "duration": {
-        "low": 90,
-        "high": 180,
-        "unit": "minutes"
-      },
-      "direct_transition": "Post_Index_Inpatient_Delay"
+      "direct_transition": "Index_Level_Draw"
     },
     "Post_Index_Inpatient_Delay": {
       "type": "Delay",
@@ -2210,7 +2147,7 @@
         "outcome_nhd.sql resolves the home set dynamically from UB04 codes 01 and 06",
         "plus CMS place-of-service 8536 and their 'Maps to' targets, so this visit is",
         "excluded from the NHD outcome cohort.",
-        "NUBC 01 -> UB04 'Pt dis status' -> OMOP 581476 (Home Visit) [vocab query \u2014 2026-08-02].",
+        "NUBC 01 -> UB04 'Pt dis status' -> OMOP 581476 (Home Visit) [vocab query — 2026-08-02].",
         "The synthea-pad fork emits this as the DISCHARGE column of",
         "encounters.csv; Step 5's post-INSERT fix-up in",
         "scripts/etl/run_synthea_full_csv_builder_etl.R resolves it into",
@@ -2228,7 +2165,7 @@
       "remarks": [
         "Discharge to a skilled nursing facility - a NON-HOME discharge.",
         "Most common non-home destination after major lower extremity amputation.",
-        "NUBC 03 -> UB04 'Pt dis status' -> OMOP 8863 (Skilled Nursing Facility) [vocab query \u2014 2026-08-02].",
+        "NUBC 03 -> UB04 'Pt dis status' -> OMOP 8863 (Skilled Nursing Facility) [vocab query — 2026-08-02].",
         "The synthea-pad fork emits this as the DISCHARGE column of",
         "encounters.csv; Step 5's post-INSERT fix-up in",
         "scripts/etl/run_synthea_full_csv_builder_etl.R resolves it into",
@@ -2246,7 +2183,7 @@
       "remarks": [
         "Discharge to an inpatient rehabilitation facility - a NON-HOME discharge.",
         "Typical for younger/fitter amputees being fitted for a prosthesis.",
-        "NUBC 62 -> UB04 'Pt dis status' -> OMOP 38004285 (Rehabilitation Hospital) [vocab query \u2014 2026-08-02].",
+        "NUBC 62 -> UB04 'Pt dis status' -> OMOP 38004285 (Rehabilitation Hospital) [vocab query — 2026-08-02].",
         "The synthea-pad fork emits this as the DISCHARGE column of",
         "encounters.csv; Step 5's post-INSERT fix-up in",
         "scripts/etl/run_synthea_full_csv_builder_etl.R resolves it into",
@@ -2279,23 +2216,23 @@
     "Outcome_Assessment": {
       "type": "Simple",
       "remarks": [
-        "OUTCOME INCIDENCE GATE \u2014 90-day post-discharge outcomes (ED visit + readmission).",
+        "OUTCOME INCIDENCE GATE — 90-day post-discharge outcomes (ED visit + readmission).",
         "Three-way marginal split over the full cohort:",
-        "  0.35 (35%) \u2014 post-discharge ED visit (Outcome_Onset). Of these, 70% go on",
+        "  0.35 (35%) — post-discharge ED visit (Outcome_Onset). Of these, 70% go on",
         "               to an inpatient readmission (see Post_ED_Readmission_Assessment).",
-        "  0.03 (3%)  \u2014 inpatient readmission WITHOUT a preceding ED visit",
+        "  0.03 (3%)  — inpatient readmission WITHOUT a preceding ED visit",
         "               (direct to Readmission_Encounter).",
-        "  0.62 (62%) \u2014 no post-discharge outcome (Terminal).",
-        "Net readmission incidence \u2248 0.35*0.70 + 0.03 = 27.5% of the cohort;",
+        "  0.62 (62%) — no post-discharge outcome (Terminal).",
+        "Net readmission incidence ≈ 0.35*0.70 + 0.03 = 27.5% of the cohort;",
         "ED visit incidence stays 35% (literature 25-40% after major LE amputation).",
-        "NOTE: unconditional incidence \u2014 VA-FI frailty burden does not adjust these",
+        "NOTE: unconditional incidence — VA-FI frailty burden does not adjust these",
         "probabilities. RESEARCHER_ADJUSTS: edit the distributions below, and the",
         "70/30 split in Post_ED_Readmission_Assessment, per pilot data."
       ],
       "distributed_transition": [
         {
           "distribution": 0.62,
-          "transition": "Terminal"
+          "transition": "Index_Attributes_Guard"
         },
         {
           "distribution": 0.35,
@@ -2314,7 +2251,7 @@
         "In OMOP this is a visit_occurrence event (visit_concept_id = 9203),",
         "not a condition_occurrence. The outcome SQL (cohorts/outcome_ed_visit.sql)",
         "queries visit_occurrence directly.",
-        "SNOMED-CT 50849002 'Emergency room admission' [vocab query \u2014 2026-07-05] is used here",
+        "SNOMED-CT 50849002 'Emergency room admission' [vocab query — 2026-07-05] is used here",
         "as the condition trigger so the ETL can route it to the correct table.",
         "Verify: Rscript scripts/concept_lookup.R 'emergency room admission' Visit"
       ],
@@ -2322,7 +2259,7 @@
         {
           "system": "SNOMED-CT",
           "code": "50849002",
-          "display": "Emergency room admission [vocab query \u2014 OMOP 9203]"
+          "display": "Emergency room admission [vocab query — OMOP 9203]"
         }
       ],
       "assign_to_attribute": "study_outcome",
@@ -2333,7 +2270,7 @@
       "remarks": [
         "ED encounter in which the outcome is recorded.",
         "encounter_class 'emergency' maps to visit_concept_id 9203 in OMOP ETL.",
-        "SNOMED-CT 50849002 'Emergency room admission' [vocab query \u2014 2026-07-05].",
+        "SNOMED-CT 50849002 'Emergency room admission' [vocab query — 2026-07-05].",
         "RESEARCHER_ADJUSTS: change encounter_class to 'inpatient' for patients",
         "requiring admission from the ED (readmission outcome variant)."
       ],
@@ -2342,7 +2279,7 @@
         {
           "system": "SNOMED-CT",
           "code": "50849002",
-          "display": "Emergency room admission [vocab query \u2014 OMOP 9203]"
+          "display": "Emergency room admission [vocab query — OMOP 9203]"
         }
       ],
       "reason": "study_outcome",
@@ -2366,7 +2303,7 @@
       "type": "EncounterEnd",
       "remarks": [
         "Closes the ED encounter. Outcome condition (exposure_condition PAD) is",
-        "chronic and not resolved \u2014 no ConditionEnd state needed.",
+        "chronic and not resolved — no ConditionEnd state needed.",
         "Patient proceeds to the post-ED readmission gate."
       ],
       "direct_transition": "Post_ED_Readmission_Assessment"
@@ -2386,7 +2323,7 @@
         },
         {
           "distribution": 0.3,
-          "transition": "Terminal"
+          "transition": "Index_Attributes_Guard"
         }
       ]
     },
@@ -2411,12 +2348,12 @@
         "point for both readmission paths: (a) admitted from a post-discharge ED",
         "visit (70% of ED visits), and (b) direct readmission without an ED visit",
         "(3% of the cohort, straight from Outcome_Assessment).",
-        "encounter_class 'inpatient' maps to visit_concept_id 9201 in OMOP \u2014 the",
+        "encounter_class 'inpatient' maps to visit_concept_id 9201 in OMOP — the",
         "same mapping the analysis (pad-amp-ed-desc) uses to detect readmission",
         "(earliest inpatient visit strictly after the index discharge date).",
-        "SNOMED-CT 32485007 'Hospital admission' [vocab query \u2014 OMOP 9201], reusing",
+        "SNOMED-CT 32485007 'Hospital admission' [vocab query — OMOP 9201], reusing",
         "the index-admission code. reason = exposure_condition (chronic PAD, assigned",
-        "on the common path before Index_Admission_Encounter) \u2014 the readmission is",
+        "on the common path before Index_Admission_Encounter) — the readmission is",
         "identified by the inpatient VISIT, not by a distinct diagnosis, so no new",
         "condition concept is introduced."
       ],
@@ -2425,7 +2362,7 @@
         {
           "system": "SNOMED-CT",
           "code": "32485007",
-          "display": "Hospital admission [vocab query \u2014 OMOP 9201]"
+          "display": "Hospital admission [vocab query — OMOP 9201]"
         }
       ],
       "reason": "exposure_condition",
@@ -2452,7 +2389,7 @@
         "as a non-home discharge. outcome_nhd.sql emits one row per qualifying",
         "inpatient visit, so a non-home code here would create a phantom NHD event."
       ],
-      "direct_transition": "Terminal",
+      "direct_transition": "Index_Attributes_Guard",
       "discharge_disposition": {
         "system": "NUBC",
         "code": "01",
@@ -2476,6 +2413,1237 @@
         {
           "distribution": 0.4,
           "transition": "Cov_CKD_Check"
+        }
+      ]
+    },
+    "Index_Level_Draw": {
+      "type": "Simple",
+      "remarks": [
+        "⚠️ THESE ARE THE CORRECTED INITIAL SHARES, NOT THE PUBLISHED MIX.",
+        "Escalation at closure migrates TT -> TF, so drawing 33.8/43.7/22.5 here",
+        "would leave the FINAL mix wrong. See the header for the arithmetic.",
+        "Re-solve if P(guillotine) or P(escalate) changes.",
+        "CORRECTED 2026-08-06 after simulating: the leak is 0.20 x 0.85 x 0.125 = 0.02125, NOT 0.20 x 0.125 — escalation is only reachable through branch (a), which is 85% of guillotines. The first draft over-corrected and ran TT +0.34pp high."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.338,
+          "transition": "Set_Level_TM"
+        },
+        {
+          "distribution": 0.44649,
+          "transition": "Set_Level_TT_Initial"
+        },
+        {
+          "distribution": 0.21551,
+          "transition": "Set_Level_TF_Initial"
+        }
+      ]
+    },
+    "Set_Level_TM": {
+      "type": "SetAttribute",
+      "remarks": [
+        "TM is ALWAYS definitive — MoRe describes guillotines only at TT and TF."
+      ],
+      "attribute": "amp_index_level",
+      "value": "TM",
+      "direct_transition": "Index_Procedure_TM"
+    },
+    "Index_Procedure_TM": {
+      "type": "Procedure",
+      "remarks": [
+        "Incident TM. SNOMED-CT 265739006 -> OMOP 4143797 [vocab query 2026-08-06].",
+        "⭐ NEW IN v2 — pad_amp v1 had NO transmetatarsal level at all, which is why",
+        "TM was a third of MoRe's cohort but 0% of the synthetic data.",
+        "Catalog: forefoot_midfoot_amputation, [DVI] 1891165."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "265739006",
+          "display": "Amputation through metatarsal bones [vocab query — OMOP 4143797]"
+        }
+      ],
+      "duration": {
+        "low": 60,
+        "high": 150,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Definitive_True_TM"
+    },
+    "Set_Definitive_True_TM": {
+      "type": "SetAttribute",
+      "attribute": "amp_index_definitive",
+      "value": true,
+      "direct_transition": "Set_Second_Code_Branch_None",
+      "remarks": [
+        "TM index: always a single definitive code, no second-code arm. MoRe's staged/",
+        "guillotine rule applied only at TT and TF, so keeping TM single-code preserves",
+        "both that fidelity and the level-mix arithmetic."
+      ]
+    },
+    "Set_Level_TT_Initial": {
+      "type": "SetAttribute",
+      "remarks": [
+        "Provisional — branch (a) escalation may overwrite this with TF."
+      ],
+      "attribute": "amp_index_level",
+      "value": "TT",
+      "direct_transition": "TT_Second_Code_Branch"
+    },
+    "Index_Procedure_TT_Definitive": {
+      "type": "Procedure",
+      "remarks": [
+        "Definitive TT. SNOMED-CT 88312006 -> OMOP 4338257 [vocab query 2026-08-06]."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "88312006",
+          "display": "Amputation of leg through tibia and fibula [vocab query — OMOP 4338257]"
+        }
+      ],
+      "duration": {
+        "low": 90,
+        "high": 180,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Definitive_True_TT"
+    },
+    "Set_Definitive_True_TT": {
+      "type": "SetAttribute",
+      "attribute": "amp_index_definitive",
+      "value": true,
+      "direct_transition": "Set_Second_Code_Branch_None"
+    },
+    "Set_Level_TF_Initial": {
+      "type": "SetAttribute",
+      "attribute": "amp_index_level",
+      "value": "TF",
+      "direct_transition": "TF_Second_Code_Branch"
+    },
+    "Index_Procedure_TF_Definitive": {
+      "type": "Procedure",
+      "remarks": [
+        "Definitive TF. SNOMED-CT 79733001 -> OMOP 4195136 [vocab query 2026-08-06]."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "79733001",
+          "display": "Amputation above-knee [vocab query — OMOP 4195136]"
+        }
+      ],
+      "duration": {
+        "low": 120,
+        "high": 210,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Definitive_True_TF"
+    },
+    "Set_Definitive_True_TF": {
+      "type": "SetAttribute",
+      "attribute": "amp_index_definitive",
+      "value": true,
+      "direct_transition": "Set_Second_Code_Branch_None"
+    },
+    "Set_Level_TT_Confirmed": {
+      "type": "SetAttribute",
+      "attribute": "amp_index_level",
+      "value": "TT",
+      "direct_transition": "Set_Definitive_True_Staged"
+    },
+    "Set_Level_TF_Escalated": {
+      "type": "SetAttribute",
+      "attribute": "amp_index_level",
+      "value": "TF",
+      "direct_transition": "Set_Definitive_True_Staged"
+    },
+    "Set_Level_TF_Confirmed": {
+      "type": "SetAttribute",
+      "attribute": "amp_index_level",
+      "value": "TF",
+      "direct_transition": "Set_Definitive_True_Staged"
+    },
+    "Set_Level_From_First_Code_TT": {
+      "type": "SetAttribute",
+      "remarks": [
+        "Level comes from the FIRST code. A second code 22-42 days out is an outcome,",
+        "not part of the index, so it does not reclassify the level."
+      ],
+      "attribute": "amp_index_level",
+      "value": "TT",
+      "direct_transition": "Set_Definitive_True_Recoded"
+    },
+    "Set_Level_From_First_Code_TF": {
+      "type": "SetAttribute",
+      "attribute": "amp_index_level",
+      "value": "TF",
+      "direct_transition": "Set_Definitive_True_Recoded",
+      "remarks": [
+        "Level comes from the FIRST code. A second code 22-42 days out is an outcome,",
+        "not part of the index, so it does not reclassify the level."
+      ]
+    },
+    "Set_Definitive_True_Recoded": {
+      "type": "SetAttribute",
+      "remarks": [
+        "definitive = true, as for every index now. The late second code is unambiguously",
+        "a re-amputation under BOTH the temporal gate and MoRe's literal rule — which is",
+        "why this arm is the clean positive control and the 1-21 day arm is not."
+      ],
+      "attribute": "amp_index_definitive",
+      "value": true,
+      "direct_transition": "Set_Late_Closure_Is_Reamp"
+    },
+    "Set_Late_Closure_Is_Reamp": {
+      "type": "SetAttribute",
+      "remarks": [
+        "⚠️ CALIBRATION INTERACTION. The late closure sits inside the 1-365 window, so",
+        "it IS a re-amputation. Flagging it here stops pad_amp_reamp double-counting",
+        "— its Reamp_Already_Occurred_Check skips these patients to the ELEVATED death",
+        "hazard. Costs ~1.32% of all patients as 'free' re-amputations, pushing the",
+        "marginal from ~27.7% to ~29.0%, so pad_amp_reamp's monthly hazards MUST be",
+        "re-solved once this module is installed."
+      ],
+      "attribute": "amp_reamp_occurred",
+      "value": true,
+      "direct_transition": "Set_Late_Closure_Subtype"
+    },
+    "Set_Late_Closure_Subtype": {
+      "type": "SetAttribute",
+      "attribute": "amp_reamp_subtype",
+      "value": "same_level",
+      "direct_transition": "Set_Second_Code_Branch_Late"
+    },
+    "Index_Sequence_Complete": {
+      "type": "Simple",
+      "remarks": [
+        "Rejoins pad_amp_dispo's existing post-index flow — discharge disposition, ED and readmission logic are untouched."
+      ],
+      "direct_transition": "Post_Index_Inpatient_Delay"
+    },
+    "Index_Procedure_TT_Staged_Within_3wk": {
+      "type": "Procedure",
+      "remarks": [
+        "Index TT — the FIRST of two codes. SNOMED-CT 88312006 -> OMOP 4338257 [vocab query 2026-08-06]."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "88312006",
+          "display": "Amputation of leg through tibia and fibula [vocab query — OMOP 4338257]"
+        }
+      ],
+      "duration": {
+        "low": 90,
+        "high": 180,
+        "unit": "minutes"
+      },
+      "direct_transition": "TT_Second_Code_Early_Delay"
+    },
+    "Index_Procedure_TT_Staged_Late": {
+      "type": "Procedure",
+      "remarks": [
+        "Index TT — the FIRST of two codes. SNOMED-CT 88312006 -> OMOP 4338257 [vocab query 2026-08-06]."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "88312006",
+          "display": "Amputation of leg through tibia and fibula [vocab query — OMOP 4338257]"
+        }
+      ],
+      "duration": {
+        "low": 90,
+        "high": 180,
+        "unit": "minutes"
+      },
+      "direct_transition": "TT_Second_Code_Late_Delay"
+    },
+    "Index_Procedure_TF_Staged_Within_3wk": {
+      "type": "Procedure",
+      "remarks": [
+        "Index TF — the FIRST of two codes. SNOMED-CT 79733001 -> OMOP 4195136 [vocab query 2026-08-06]."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "79733001",
+          "display": "Amputation above-knee [vocab query — OMOP 4195136]"
+        }
+      ],
+      "duration": {
+        "low": 120,
+        "high": 210,
+        "unit": "minutes"
+      },
+      "direct_transition": "TF_Second_Code_Early_Delay"
+    },
+    "Index_Procedure_TF_Staged_Late": {
+      "type": "Procedure",
+      "remarks": [
+        "Index TF — the FIRST of two codes. SNOMED-CT 79733001 -> OMOP 4195136 [vocab query 2026-08-06]."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "79733001",
+          "display": "Amputation above-knee [vocab query — OMOP 4195136]"
+        }
+      ],
+      "duration": {
+        "low": 120,
+        "high": 210,
+        "unit": "minutes"
+      },
+      "direct_transition": "TF_Second_Code_Late_Delay"
+    },
+    "Set_Second_Code_Early": {
+      "type": "SetAttribute",
+      "remarks": [
+        "⭐ THE AMBIGUOUS CASE, and the whole reason this arm exists. Two amputation codes",
+        "1-21 days apart are INDISTINGUISHABLE in the CDM between:",
+        "   (i)  a staged amputation — the second code completes the index event, or",
+        "   (ii) a genuine early re-amputation — the second code is an outcome.",
+        "A temporal gate absorbs these into the index; MoRe's literal 1-365 rule counts",
+        "them. QC reports this count as the MEASURED divergence between the two approaches.",
+        "⚠️ MANUAL REVIEW REQUIRED — see the note in the module header."
+      ],
+      "attribute": "amp_second_code_early",
+      "value": true,
+      "direct_transition": "Set_Second_Code_Branch_Early"
+    },
+    "TT_Second_Code_Branch": {
+      "type": "Simple",
+      "remarks": [
+        "STAGED-AMPUTATION PATTERN. Replaces the guillotine split 2026-08-06 after the",
+        "ETL check showed CPT4 cannot reach the CDM. Every index is now a DEFINITIVE",
+        "SNOMED code; what varies is whether a SECOND amputation code follows, and when.",
+        "",
+        "0.17 = 0.20 x 0.85 (previously P(guillotine|TT) x P(closure within 3wk)) and",
+        "0.02 = 0.20 x 0.10, so the emitted event pattern is UNCHANGED from the",
+        "guillotine version. Only the index CODE changed, from CPT4 to SNOMED. The",
+        "escalation leak stays 0.02125 and Index_Level_Draw needs no re-solve."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.17,
+          "transition": "Index_Procedure_TT_Staged_Within_3wk"
+        },
+        {
+          "distribution": 0.02,
+          "transition": "Index_Procedure_TT_Staged_Late"
+        },
+        {
+          "distribution": 0.81,
+          "transition": "Index_Procedure_TT_Definitive"
+        }
+      ]
+    },
+    "TF_Second_Code_Branch": {
+      "type": "Simple",
+      "remarks": [
+        "As TT. No escalation arm — TF has nowhere higher within MoRe's levels."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.17,
+          "transition": "Index_Procedure_TF_Staged_Within_3wk"
+        },
+        {
+          "distribution": 0.02,
+          "transition": "Index_Procedure_TF_Staged_Late"
+        },
+        {
+          "distribution": 0.81,
+          "transition": "Index_Procedure_TF_Definitive"
+        }
+      ]
+    },
+    "TT_Second_Code_Early_Delay": {
+      "type": "Delay",
+      "remarks": [
+        "Days 1-21 — inside MoRe's three-week search by construction. Day 21 is the",
+        "boundary that must NOT count as a re-amputation, against day 22 which must.",
+        "This is the 1-2 week second-BKA-code pattern seen in real claims."
+      ],
+      "range": {
+        "low": 1,
+        "high": 21,
+        "unit": "days"
+      },
+      "direct_transition": "TT_Second_Code_Escalation_Split"
+    },
+    "TF_Second_Code_Early_Delay": {
+      "type": "Delay",
+      "range": {
+        "low": 1,
+        "high": 21,
+        "unit": "days"
+      },
+      "direct_transition": "Second_Code_TF"
+    },
+    "TT_Second_Code_Late_Delay": {
+      "type": "Delay",
+      "remarks": [
+        "Branch (b), days 22-42. MoRe: 'an error in the initial coding was presumed",
+        "and the guillotine code was recoded as a definitive amputation.'",
+        "⭐ THE SHARPEST TEST IN THE DATASET: the SAME code at day 20 is part of the",
+        "index event, at day 25 it is an outcome. Nothing else tests that."
+      ],
+      "range": {
+        "low": 22,
+        "high": 42,
+        "unit": "days"
+      },
+      "direct_transition": "Second_Code_TT_Late"
+    },
+    "TF_Second_Code_Late_Delay": {
+      "type": "Delay",
+      "range": {
+        "low": 22,
+        "high": 42,
+        "unit": "days"
+      },
+      "direct_transition": "Second_Code_TF_Late"
+    },
+    "TT_Second_Code_Escalation_Split": {
+      "type": "Simple",
+      "remarks": [
+        "The closure CLASSIFIES the level. ~12.5% are closed higher than the",
+        "guillotine (TT -> TF) — a guillotine implies marginal tissue viability.",
+        "RESEARCHER_ADJUSTS, and the Index_Level_Draw shares above must be re-solved",
+        "if this changes."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.875,
+          "transition": "Second_Code_TT"
+        },
+        {
+          "distribution": 0.125,
+          "transition": "Second_Code_TF_Escalated"
+        }
+      ]
+    },
+    "Second_Code_TT": {
+      "type": "Procedure",
+      "remarks": [
+        "⭐ THE STRONGEST NEGATIVE CONTROL. A SECOND definitive TT code 1-21 days",
+        "after the guillotine — identical to the index code, distinguished ONLY by",
+        "date. Part of the INDEX EVENT; must NOT count as a re-amputation."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "88312006",
+          "display": "Amputation of leg through tibia and fibula [vocab query — OMOP 4338257]"
+        }
+      ],
+      "duration": {
+        "low": 60,
+        "high": 150,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Level_TT_Confirmed"
+    },
+    "Second_Code_TF": {
+      "type": "Procedure",
+      "remarks": [
+        "Second definitive TF code, days 1-21. Negative control, as Closure_Procedure_TT."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "79733001",
+          "display": "Amputation above-knee [vocab query — OMOP 4195136]"
+        }
+      ],
+      "duration": {
+        "low": 90,
+        "high": 180,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Level_TF_Confirmed"
+    },
+    "Second_Code_TF_Escalated": {
+      "type": "Procedure",
+      "remarks": [
+        "ESCALATED at closure — guillotine was TT, closure is TF, so per MoRe the",
+        "INCIDENT LEVEL IS TF. A SQL that takes the level from the guillotine code",
+        "rather than the closure will mis-level exactly these patients."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "79733001",
+          "display": "Amputation above-knee [vocab query — OMOP 4195136]"
+        }
+      ],
+      "duration": {
+        "low": 120,
+        "high": 210,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Level_TF_Escalated"
+    },
+    "Second_Code_TT_Late": {
+      "type": "Procedure",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "88312006",
+          "display": "Amputation of leg through tibia and fibula [vocab query — OMOP 4338257]"
+        }
+      ],
+      "duration": {
+        "low": 60,
+        "high": 150,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Level_From_First_Code_TT"
+    },
+    "Second_Code_TF_Late": {
+      "type": "Procedure",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "79733001",
+          "display": "Amputation above-knee [vocab query — OMOP 4195136]"
+        }
+      ],
+      "duration": {
+        "low": 90,
+        "high": 180,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Level_From_First_Code_TF"
+    },
+    "Set_Definitive_True_Staged": {
+      "type": "SetAttribute",
+      "remarks": [
+        "⚠️ NOW ALWAYS TRUE. Without a guillotine code there is no signal that selects",
+        "MoRe's 22-365 day window, so the 1-365 window applies to everyone. This is the",
+        "item-16 DEVIATION: a temporal gate substitutes for MoRe's code-keyed rule."
+      ],
+      "attribute": "amp_index_definitive",
+      "value": true,
+      "direct_transition": "Set_Second_Code_Early"
+    },
+    "Set_Second_Code_Branch_Early": {
+      "type": "SetAttribute",
+      "attribute": "amp_index_closure_branch",
+      "value": "within_3wk",
+      "direct_transition": "Index_Sequence_Complete"
+    },
+    "Set_Second_Code_Branch_Late": {
+      "type": "SetAttribute",
+      "attribute": "amp_index_closure_branch",
+      "value": "late",
+      "direct_transition": "Index_Sequence_Complete"
+    },
+    "Set_Second_Code_Branch_None": {
+      "type": "SetAttribute",
+      "remarks": [
+        "Single-code index — no second amputation code. Labelled so the three arms account for every patient in QC."
+      ],
+      "attribute": "amp_index_closure_branch",
+      "value": "none",
+      "direct_transition": "Index_Sequence_Complete"
+    },
+    "Index_Attributes_Guard": {
+      "type": "Simple",
+      "remarks": [
+        "Converted from a Guard during the merge. A Synthea Guard WAITS until its",
+        "condition is met, so a non-cohort patient (amp_index_level never set —",
+        "e.g. the Age_Cap_Check exit) would stall here forever. As a conditional it",
+        "routes them straight to Terminal instead. Fails closed either way: no",
+        "amputation, no progression."
+      ],
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "amp_index_level",
+            "operator": "is not nil"
+          },
+          "transition": "Init_Month_Counter"
+        },
+        {
+          "transition": "Terminal"
+        }
+      ]
+    },
+    "Init_Month_Counter": {
+      "type": "SetAttribute",
+      "attribute": "amp_month",
+      "value": 0,
+      "direct_transition": "Init_Reamp_Flag"
+    },
+    "Init_Reamp_Flag": {
+      "type": "SetAttribute",
+      "remarks": [
+        "Explicit false rather than nil, so the QC query can distinguish 'checked, did not happen' from 'never evaluated'."
+      ],
+      "attribute": "amp_reamp_occurred",
+      "value": false,
+      "direct_transition": "Month_Tick"
+    },
+    "Month_Tick": {
+      "type": "Counter",
+      "remarks": [
+        "Slice 1..12. The loop exit tests amp_month >= 12."
+      ],
+      "attribute": "amp_month",
+      "action": "increment",
+      "direct_transition": "Month_Delay"
+    },
+    "Month_Delay": {
+      "type": "Delay",
+      "remarks": [
+        "One monthly slice. 30-31 days, so 12 slices span ~360-372 days rather than",
+        "exactly 365. That JITTER IS DELIBERATE: it puts some events either side of",
+        "the day-365 boundary, which is precisely where an off-by-one in the cohort",
+        "SQL shows up. A fixed 30 days would total 360 and never test the boundary.",
+        "⚠️ Consequence for QC: a small number of month-12 events land after day 365",
+        "and must NOT be counted. The QC query has to assert that, not assume it."
+      ],
+      "range": {
+        "low": 30,
+        "high": 31,
+        "unit": "days"
+      },
+      "direct_transition": "Reamp_Already_Occurred_Check"
+    },
+    "Reamp_Already_Occurred_Check": {
+      "type": "Simple",
+      "remarks": [
+        "MoRe's outcome is BINARY 'any re-amputation', so once a patient has one",
+        "there is nothing more to detect and further re-amputation checks are",
+        "skipped. Death hazard continues — at the ELEVATED rate."
+      ],
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "amp_reamp_occurred",
+            "operator": "==",
+            "value": true
+          },
+          "transition": "Death_Hazard_After_Reamp"
+        },
+        {
+          "transition": "Reamp_Level_Router"
+        }
+      ]
+    },
+    "Reamp_Level_Router": {
+      "type": "Simple",
+      "remarks": [
+        "Per-level monthly hazard. Level multipliers are a CLINICAL PRIOR, not",
+        "published — see the header. Weighted by the published level mix so the",
+        "overall 28.0% marginal holds regardless of how they are tuned."
+      ],
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "amp_index_level",
+            "operator": "==",
+            "value": "TM"
+          },
+          "transition": "TM_Monthly_Reamp_Hazard"
+        },
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "amp_index_level",
+            "operator": "==",
+            "value": "TT"
+          },
+          "transition": "TT_Monthly_Reamp_Hazard"
+        },
+        {
+          "transition": "TF_Monthly_Reamp_Hazard"
+        }
+      ]
+    },
+    "TM_Monthly_Reamp_Hazard": {
+      "type": "Simple",
+      "remarks": [
+        "TM: 0.0403/month (1.40x base). Most room to progress. RESEARCHER_ADJUSTS."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.0403,
+          "transition": "Reamp_Window_Eligibility"
+        },
+        {
+          "distribution": 0.9597,
+          "transition": "Death_Hazard_Baseline"
+        }
+      ]
+    },
+    "TT_Monthly_Reamp_Hazard": {
+      "type": "Simple",
+      "remarks": [
+        "TT: 0.0288/month — the solved base rate."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.0288,
+          "transition": "Reamp_Window_Eligibility"
+        },
+        {
+          "distribution": 0.9712,
+          "transition": "Death_Hazard_Baseline"
+        }
+      ]
+    },
+    "TF_Monthly_Reamp_Hazard": {
+      "type": "Simple",
+      "remarks": [
+        "TF: 0.0173/month (0.60x base). No higher LE level exists within MoRe's scheme. RESEARCHER_ADJUSTS."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.0173,
+          "transition": "Reamp_Window_Eligibility"
+        },
+        {
+          "distribution": 0.9827,
+          "transition": "Death_Hazard_Baseline"
+        }
+      ]
+    },
+    "Reamp_Window_Eligibility": {
+      "type": "Simple",
+      "remarks": [
+        "THE TWO-WINDOW RULE, applied where it actually bites. In month 1 a",
+        "GUILLOTINE/disarticulation index is still inside MoRe's day 1-21 exclusion,",
+        "so a hazard draw here is SUPPRESSED — not eligible yet, and no event is",
+        "emitted. From month 2 onward (day >= 30) both windows are open.",
+        "A definitive index has no exclusion, so month 1 counts normally.",
+        "This is the state that makes a single-window implementation detectable."
+      ],
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "And",
+            "conditions": [
+              {
+                "condition_type": "Attribute",
+                "attribute": "amp_index_definitive",
+                "operator": "==",
+                "value": false
+              },
+              {
+                "condition_type": "Attribute",
+                "attribute": "amp_month",
+                "operator": "<=",
+                "value": 1
+              }
+            ]
+          },
+          "transition": "Death_Hazard_Baseline"
+        },
+        {
+          "transition": "Reamp_Subtype_Router"
+        }
+      ]
+    },
+    "Reamp_Subtype_Router": {
+      "type": "Simple",
+      "remarks": [
+        "Sub-type availability depends on the INCIDENT level — the crux of MoRe's",
+        "algorithm. TM has NO soft-tissue-revision or same-level codes, so any",
+        "subsequent TM code IS the same-level re-amputation. TF has no higher level.",
+        "A single sub-type router for all levels would emit TT-only codes for TM",
+        "patients and silently make the TM stratum unvalidatable."
+      ],
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "amp_index_level",
+            "operator": "==",
+            "value": "TM"
+          },
+          "transition": "TM_Reamp_Subtype"
+        },
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "amp_index_level",
+            "operator": "==",
+            "value": "TT"
+          },
+          "transition": "TT_Reamp_Subtype"
+        },
+        {
+          "transition": "TF_Reamp_Subtype"
+        }
+      ]
+    },
+    "TM_Reamp_Subtype": {
+      "type": "Simple",
+      "remarks": [
+        "RESEARCHER_ADJUSTS. Both arms must stay non-trivial or the 'all TM codes count' rule is never exercised."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.55,
+          "transition": "Reamp_TM_Same_Level"
+        },
+        {
+          "distribution": 0.45,
+          "transition": "Reamp_TM_To_Higher"
+        }
+      ]
+    },
+    "TT_Reamp_Subtype": {
+      "type": "Simple",
+      "remarks": [
+        "All three sub-types available. RESEARCHER_ADJUSTS."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.3,
+          "transition": "Reamp_Soft_Tissue_Revision"
+        },
+        {
+          "distribution": 0.35,
+          "transition": "Reamp_TT_Same_Level"
+        },
+        {
+          "distribution": 0.35,
+          "transition": "Reamp_TT_To_TF"
+        }
+      ]
+    },
+    "TF_Reamp_Subtype": {
+      "type": "Simple",
+      "remarks": [
+        "No higher LE level above TF in MoRe's scheme, so revision and same-level only. This asymmetry is real."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.45,
+          "transition": "Reamp_Soft_Tissue_Revision"
+        },
+        {
+          "distribution": 0.55,
+          "transition": "Reamp_TF_Same_Level"
+        }
+      ]
+    },
+    "Reamp_Soft_Tissue_Revision": {
+      "type": "Procedure",
+      "remarks": [
+        "Sub-type (a). SNOMED-CT 180048002 -> OMOP 4078404 [vocab query 2026-08-06,",
+        "standard, Procedure]. Also the 'Maps to' target of ICD-9 84.3, the revision",
+        "code MoRe's ref 11 used. TT/TF only — TM bypasses this state."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "180048002",
+          "display": "Revision coverage of amputation stump [vocab query — OMOP 4078404]"
+        }
+      ],
+      "duration": {
+        "low": 45,
+        "high": 120,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Reamp_Subtype_SoftTissue"
+    },
+    "Reamp_TM_Same_Level": {
+      "type": "Procedure",
+      "remarks": [
+        "Sub-type (b), TM special case. SNOMED-CT 265739006 -> OMOP 4143797 [vocab query 2026-08-06]. Catalog: forefoot_midfoot_amputation, [DVI] 1891165."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "265739006",
+          "display": "Amputation through metatarsal bones [vocab query — OMOP 4143797]"
+        }
+      ],
+      "duration": {
+        "low": 60,
+        "high": 150,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Reamp_Subtype_SameLevel"
+    },
+    "Reamp_TT_Same_Level": {
+      "type": "Procedure",
+      "remarks": [
+        "Sub-type (b), TT. SNOMED-CT 88312006 -> OMOP 4338257 [vocab query 2026-08-06]."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "88312006",
+          "display": "Amputation of leg through tibia and fibula [vocab query — OMOP 4338257]"
+        }
+      ],
+      "duration": {
+        "low": 90,
+        "high": 180,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Reamp_Subtype_SameLevel"
+    },
+    "Reamp_TF_Same_Level": {
+      "type": "Procedure",
+      "remarks": [
+        "Sub-type (b), TF. SNOMED-CT 79733001 -> OMOP 4195136 [vocab query 2026-08-06]."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "79733001",
+          "display": "Amputation above-knee [vocab query — OMOP 4195136]"
+        }
+      ],
+      "duration": {
+        "low": 120,
+        "high": 210,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Reamp_Subtype_SameLevel"
+    },
+    "Reamp_TM_To_Higher": {
+      "type": "Simple",
+      "remarks": [
+        "Sub-type (c) from TM. RESEARCHER_ADJUSTS — TM usually progresses to TT rather than straight to TF."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.75,
+          "transition": "Reamp_Higher_TT"
+        },
+        {
+          "distribution": 0.25,
+          "transition": "Reamp_Higher_TF"
+        }
+      ]
+    },
+    "Reamp_Higher_TT": {
+      "type": "Procedure",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "88312006",
+          "display": "Amputation of leg through tibia and fibula [vocab query — OMOP 4338257]"
+        }
+      ],
+      "duration": {
+        "low": 90,
+        "high": 180,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Reamp_Subtype_Higher"
+    },
+    "Reamp_TT_To_TF": {
+      "type": "Procedure",
+      "remarks": [
+        "The canonical progression MoRe cites (TT -> TF)."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "79733001",
+          "display": "Amputation above-knee [vocab query — OMOP 4195136]"
+        }
+      ],
+      "duration": {
+        "low": 120,
+        "high": 210,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Reamp_Subtype_Higher"
+    },
+    "Reamp_Higher_TF": {
+      "type": "Procedure",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "79733001",
+          "display": "Amputation above-knee [vocab query — OMOP 4195136]"
+        }
+      ],
+      "duration": {
+        "low": 120,
+        "high": 210,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Reamp_Subtype_Higher"
+    },
+    "Set_Reamp_Subtype_SoftTissue": {
+      "type": "SetAttribute",
+      "attribute": "amp_reamp_subtype",
+      "value": "soft_tissue_revision",
+      "direct_transition": "Set_Reamp_Occurred"
+    },
+    "Set_Reamp_Subtype_SameLevel": {
+      "type": "SetAttribute",
+      "attribute": "amp_reamp_subtype",
+      "value": "same_level",
+      "direct_transition": "Set_Reamp_Occurred"
+    },
+    "Set_Reamp_Subtype_Higher": {
+      "type": "SetAttribute",
+      "attribute": "amp_reamp_subtype",
+      "value": "higher_level",
+      "direct_transition": "Set_Reamp_Occurred"
+    },
+    "Set_Reamp_Occurred": {
+      "type": "SetAttribute",
+      "remarks": [
+        "Ground truth for QC: compare against what the cohort SQL detects, per sub-type and per level."
+      ],
+      "attribute": "amp_reamp_occurred",
+      "value": true,
+      "direct_transition": "Reamp_Laterality_Mix"
+    },
+    "Reamp_Laterality_Mix": {
+      "type": "Simple",
+      "remarks": [
+        "MoRe counts IPSILATERAL, UNKNOWN, or BILATERAL. Only confirmed",
+        "contralateral is excluded, so an implementation requiring ipsilateral",
+        "UNDER-counts — hence the unknown and bilateral arms exist to catch that.",
+        "⚠️ TODO [ETL]: Synthea emits no laterality, so these arms are documentation",
+        "of intent until the ETL populates a modifier. RESEARCHER_ADJUSTS."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.8,
+          "transition": "Set_Reamp_Lat_Ipsilateral"
+        },
+        {
+          "distribution": 0.15,
+          "transition": "Set_Reamp_Lat_Unknown"
+        },
+        {
+          "distribution": 0.05,
+          "transition": "Set_Reamp_Lat_Bilateral"
+        }
+      ]
+    },
+    "Set_Reamp_Lat_Ipsilateral": {
+      "type": "SetAttribute",
+      "attribute": "amp_reamp_laterality",
+      "value": "ipsilateral",
+      "direct_transition": "Death_Hazard_After_Reamp"
+    },
+    "Set_Reamp_Lat_Unknown": {
+      "type": "SetAttribute",
+      "attribute": "amp_reamp_laterality",
+      "value": "unknown",
+      "direct_transition": "Death_Hazard_After_Reamp"
+    },
+    "Set_Reamp_Lat_Bilateral": {
+      "type": "SetAttribute",
+      "attribute": "amp_reamp_laterality",
+      "value": "bilateral",
+      "direct_transition": "Death_Hazard_After_Reamp"
+    },
+    "Death_Hazard_Baseline": {
+      "type": "Simple",
+      "remarks": [
+        "Monthly death hazard for patients with NO re-amputation yet: 0.0156.",
+        "Runs AFTER the re-amputation check in the same slice, which is what makes",
+        "MoRe's 'the re-amputation preceded death' constraint structural."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.0156,
+          "transition": "Death_State"
+        },
+        {
+          "distribution": 0.9844,
+          "transition": "Decoy_Hazard_Check"
+        }
+      ]
+    },
+    "Death_Hazard_After_Reamp": {
+      "type": "Simple",
+      "remarks": [
+        "ELEVATED monthly death hazard after a re-amputation: 0.0289 = 1.85x the",
+        "0.0156 baseline. This multiplier is what reproduces MoRe's D/R cell (5.1%);",
+        "independent hazards give only 3.3%. INFERRED from the published joint",
+        "distribution, not stated by MoRe — see the header."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.0289,
+          "transition": "Death_State"
+        },
+        {
+          "distribution": 0.9711,
+          "transition": "Decoy_Hazard_Check"
+        }
+      ]
+    },
+    "Death_State": {
+      "type": "Death",
+      "remarks": [
+        "Sets death_date, which the ETL writes to the OMOP death table. Synthea",
+        "STOPS module processing here — which is precisely why competing risks now",
+        "work for free: a patient who dies never re-enters the monthly loop and so",
+        "is correctly no longer at risk of re-amputation."
+      ],
+      "direct_transition": "Set_Death_1y"
+    },
+    "Set_Death_1y": {
+      "type": "SetAttribute",
+      "attribute": "amp_death_1y",
+      "value": true,
+      "direct_transition": "Terminal"
+    },
+    "Decoy_Hazard_Check": {
+      "type": "Simple",
+      "remarks": [
+        "NEGATIVE CONTROLS, emitted as a small monthly hazard so they spread across",
+        "the year like real events, while each still sets an attribute so QC can",
+        "assert an exact expected count. ~1.5%/month gives roughly 1 in 6 patients",
+        "at least one decoy over 12 months. RESEARCHER_ADJUSTS."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.009,
+          "transition": "Decoy_Contralateral_Procedure"
+        },
+        {
+          "distribution": 0.006,
+          "transition": "Decoy_Toe_Or_Ray_Subtype"
+        },
+        {
+          "distribution": 0.985,
+          "transition": "Month_Loop_Check"
+        }
+      ]
+    },
+    "Decoy_Contralateral_Procedure": {
+      "type": "Procedure",
+      "remarks": [
+        "DECOY 2 — correct timing, correct level, WRONG LIMB. MoRe excludes only",
+        "confirmed contralateral events.",
+        "⚠️ TODO [ETL]: without emitted laterality this is indistinguishable from a",
+        "real ipsilateral re-amputation and will read as a false positive that looks",
+        "like a SQL bug. Resolve before scoring this control."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "88312006",
+          "display": "Amputation of leg through tibia and fibula [vocab query — OMOP 4338257]"
+        }
+      ],
+      "duration": {
+        "low": 90,
+        "high": 180,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Decoy_Contralateral"
+    },
+    "Set_Decoy_Contralateral": {
+      "type": "SetAttribute",
+      "attribute": "amp_decoy_contralateral",
+      "value": true,
+      "direct_transition": "Month_Loop_Check"
+    },
+    "Decoy_Toe_Or_Ray_Subtype": {
+      "type": "Simple",
+      "remarks": [
+        "DECOY 3 — toe or ray amputation. Neither is an incident level for MoRe",
+        "(TM/TT/TF only) and neither is 'same or higher' than any of them.",
+        "This control exists because the workspace's minor_amputation set CONTAINS",
+        "toe and ray, so SQL built from that broad set rather than",
+        "forefoot_midfoot_amputation ([DVI] 1891165) will wrongly count these.",
+        "See catalog toe_amputation ([DVI] 1891164)."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.6,
+          "transition": "Decoy_Toe_Procedure"
+        },
+        {
+          "distribution": 0.4,
+          "transition": "Decoy_Ray_Procedure"
+        }
+      ]
+    },
+    "Decoy_Toe_Procedure": {
+      "type": "Procedure",
+      "remarks": [
+        "SNOMED-CT 371186005 -> OMOP 4159766 [vocab query 2026-08-06]. In toe_amputation, NOT in forefoot_midfoot_amputation."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "371186005",
+          "display": "Amputation of toe [vocab query — OMOP 4159766]"
+        }
+      ],
+      "duration": {
+        "low": 20,
+        "high": 60,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Decoy_Toe_Ray"
+    },
+    "Decoy_Ray_Procedure": {
+      "type": "Procedure",
+      "remarks": [
+        "SNOMED-CT 405443002 -> OMOP 4226945 [vocab query 2026-08-06]. A ray removes",
+        "ONE metatarsal with its toe, so it is NOT transmetatarsal (which requires",
+        "removal of ALL toes) — verified 2026-08-06 that 4226945 is a SIBLING of both",
+        "the toe and TMA anchors, not a descendant of either."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "405443002",
+          "display": "Ray amputation of foot [vocab query — OMOP 4226945]"
+        }
+      ],
+      "duration": {
+        "low": 30,
+        "high": 75,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Decoy_Toe_Ray"
+    },
+    "Set_Decoy_Toe_Ray": {
+      "type": "SetAttribute",
+      "attribute": "amp_decoy_toe_or_ray",
+      "value": true,
+      "direct_transition": "Month_Loop_Check"
+    },
+    "Month_Loop_Check": {
+      "type": "Simple",
+      "remarks": [
+        "Twelve slices, then stop. Patients who reach here alive at month 12 are the",
+        "ND/NR and ND/R strata; the four-category label is DERIVED in QC from",
+        "amp_reamp_occurred x amp_death_1y rather than assigned anywhere here."
+      ],
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "amp_month",
+            "operator": "<",
+            "value": 12
+          },
+          "transition": "Month_Tick"
+        },
+        {
+          "transition": "Terminal"
         }
       ]
     }
