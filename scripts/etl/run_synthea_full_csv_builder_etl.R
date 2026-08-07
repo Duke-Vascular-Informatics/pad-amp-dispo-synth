@@ -539,13 +539,29 @@ run_synthea_full_csv_builder_etl <- function(
     invisible(NULL)
   }
 
-  # execute_sql_file() reads a SQL file, applies two SQL Server-specific patches
-  # for known ETLSyntheaBuilder syntax issues, then executes via
-  # execute_sql_with_retry().  Two files receive special treatment:
+  # execute_sql_file() reads a SQL file, applies SQL Server-specific patches
+  # for known ETLSyntheaBuilder defects, then executes via
+  # execute_sql_with_retry().  Three files receive special treatment:
   #
   #   insert_person.sql  — ETLSyntheaBuilder emits the non-standard
   #     "INSERT ... WITH CTE ... SELECT" form which SQL Server rejects.
   #     The regex below reorders it to the valid "WITH CTE ... INSERT ... SELECT".
+  #
+  #   AllVisitTable.sql  — ETLSyntheaBuilder assigns the surrogate
+  #     visit_occurrence_id with "row_number() over (order by patient)".
+  #     `patient` is non-unique (one row per visit, many visits per patient), so
+  #     the window has no total order and SQL Server is free to number tied rows
+  #     in any sequence.  Measured on a 140,684-row all_visits: re-running the
+  #     same statement under a different query plan reassigned the id for
+  #     124,044 rows.  Because downstream FINAL_VISIT_IDS dedup then breaks its
+  #     own ties on that id, an unstable numbering propagates into which visits
+  #     survive into visit_occurrence at all.  The patch appends a total-order
+  #     tie-break; encounter_id is unique within all_visits, so the resulting
+  #     ORDER BY is deterministic.  See the FINAL_VISIT_IDS note in
+  #     create_visit_rollup_tables_sql_server() for the companion fix — both are
+  #     required, since tie-breaking on visit_occurrence_id only helps once that
+  #     id is itself stable.  Upstream: OHDSI/ETL-Synthea v2.1.0 (e59d1c7),
+  #     sql/sql_server/cdm_version/v5{31,40}/AllVisitTable.sql.
   #
   #   insert_drug_era.sql — The generated query joins drug_exposure directly
   #     against concept_ancestor (75M rows), causing CXSYNC_PORT parallelism
@@ -577,6 +593,40 @@ run_synthea_full_csv_builder_etl <- function(
           select_tail
         )
       }
+    }
+
+    # AllVisitTable.sql: make the surrogate visit_occurrence_id deterministic.
+    # Rewrites the single defective window clause
+    #     row_number()over(order by patient)
+    # into
+    #     row_number() over (order by patient, encounterclass,
+    #                        VISIT_START_DATE, encounter_id)
+    # which is a total order over all_visits (encounter_id is unique there),
+    # leaving the assigned ids identical from run to run.  The regex tolerates
+    # any whitespace around "over" and "(" so it keeps matching if upstream
+    # reformats the statement; if upstream ever changes the clause itself the
+    # match fails and we stop loudly rather than silently reverting to the
+    # nondeterministic behaviour.
+    if (tolower(basename(file_path)) == "allvisittable.sql") {
+      pat <- "(?i)row_number\\s*\\(\\s*\\)\\s*over\\s*\\(\\s*order\\s+by\\s+patient\\s*\\)"
+      if (!grepl(pat, sql, perl = TRUE)) {
+        stop(
+          "AllVisitTable.sql determinism patch did not match.\n",
+          "  Expected 'row_number()over(order by patient)' in ", file_path, ".\n",
+          "  ETLSyntheaBuilder may have changed this statement upstream — re-check\n",
+          "  that the visit_occurrence_id assignment still needs (or still has) a\n",
+          "  total ORDER BY before removing this guard."
+        )
+      }
+      sql <- sub(
+        pat,
+        paste0(
+          "row_number() over (order by patient, encounterclass, ",
+          "VISIT_START_DATE, encounter_id)"
+        ),
+        sql,
+        perl = TRUE
+      )
     }
 
     # insert_drug_era.sql: the standard ETLSyntheaBuilder CTE chain references
@@ -808,6 +858,35 @@ run_synthea_full_csv_builder_etl <- function(
   # The final FINAL_VISIT_IDS step is re-implemented inline rather than from
   # a generated file to allow safe re-execution (IF OBJECT_ID ... DROP) and
   # to avoid hardcoded schema names in the generated output SQL.
+  #
+  # DETERMINISM: upstream ranks the candidate visits for an encounter with
+  # "ORDER BY PRIORITY" alone.  PRIORITY is a three-valued CASE (1/2/99), so
+  # ties are the norm, not the exception — on a 160,697-encounter Synthea run,
+  # 1,394 encounters had more than one DISTINCT candidate visit_occurrence_id
+  # at their minimum priority.  RN = 1 then picks whichever tied row the query
+  # plan happened to emit first.  That choice is not cosmetic: insert_visit_-
+  # occurrence.sql keeps only those all_visits rows that some encounter selected
+  # here (WHERE visit_occurrence_id IN (SELECT DISTINCT visit_occurrence_id_new
+  # ...)), so a different tie-break silently changes which visits exist in the
+  # CDM.  Measured across two query plans on identical input, upstream produced
+  # 139,591 vs 139,556 visit_occurrence rows with ~300 encounter UUIDs unique to
+  # each — i.e. the CDM was not reproducible even with the source CSVs frozen.
+  #
+  # The ORDER BY below is extended to a total order: prefer the earliest-
+  # starting then earliest-ending candidate visit (clinically the most defensible
+  # absorption target when an encounter falls inside more than one rolled-up
+  # visit), then fall back to the surrogate id to break anything still tied.
+  # This depends on the AllVisitTable.sql patch in execute_sql_file() — ordering
+  # on visit_occurrence_id_new is only stable once that id is itself stable.
+  #
+  # NOTE: making the tie-break deterministic also shifts the absolute row count
+  # (~139.2k rather than the ~139.6k the arbitrary ordering happened to yield),
+  # because a consistent winner concentrates encounters onto fewer distinct
+  # visits.  Any dataset registered in synthetic_data/registry.yaml before this
+  # change must be re-baselined rather than compared against its old counts.
+  #
+  # Upstream: OHDSI/ETL-Synthea v2.1.0 (e59d1c7),
+  # sql/sql_server/cdm_version/v5{31,40}/final_visit_ids.sql.
   create_visit_rollup_tables_sql_server <- function() {
     etl_sql_dir <- file.path(getwd(), "output")
     dir.create(etl_sql_dir, recursive = TRUE, showWarnings = FALSE)
@@ -833,7 +912,13 @@ run_synthea_full_csv_builder_etl <- function(
        INTO @cdm_schema.FINAL_VISIT_IDS
        FROM (
          SELECT *,
-             ROW_NUMBER() OVER (PARTITION BY encounter_id ORDER BY PRIORITY) AS RN
+             ROW_NUMBER() OVER (
+                 PARTITION BY encounter_id
+                 ORDER BY PRIORITY,
+                          VISIT_START_DATE,
+                          VISIT_END_DATE,
+                          VISIT_OCCURRENCE_ID_NEW
+             ) AS RN
          FROM (
              SELECT *,
                  CASE
