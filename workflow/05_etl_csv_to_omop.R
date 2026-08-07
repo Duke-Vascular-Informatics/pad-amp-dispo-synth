@@ -105,6 +105,22 @@ verbose <- TRUE
 use_shared_vocab_schema <- TRUE
 shared_vocab_schema     <- "omop_vocab"
 
+# Vocabulary MAP strategy.
+#
+# ETLSyntheaBuilder materializes source_to_standard_vocab_map (~4.5M rows) and
+# source_to_source_vocab_map (~6.3M rows) — together ~3.9 GB — into the CDM
+# schema on every run. Both are a pure function of the vocabulary, so when the
+# vocabulary is shared every CDM schema was building a byte-identical copy.
+#
+# TRUE  = build them once in shared_map_schema and reach them via synonyms.
+#         Rebuilt automatically when the OMOP vocabulary release changes.
+# FALSE = per-schema copies (the original ETLSyntheaBuilder behaviour).
+#
+# Ignored unless use_shared_vocab_schema is also TRUE — maps may only be shared
+# by schemas that share the vocabulary they are derived from.
+use_shared_vocab_maps <- TRUE
+shared_map_schema     <- "omop_etl_maps"
+
 # TRUE  = reload vocab into target CDM schema from CSV folder.
 # FALSE = do not use CSV vocab load path (helper script may use fallback logic).
 reload_vocab_from_csv <- FALSE
@@ -248,13 +264,35 @@ message("Run name               : ", run_name)
 
 # ---------------------------------------------------------------------------
 # Pre-flight: check and prepare the SQL Server transaction log.
-# The vocabulary CSV load (CONCEPT_ANCESTOR: 75 M rows) requires a large
-# log headroom even in SIMPLE recovery.  This call shrinks any space left
-# over from prior runs and pre-grows the log to 25 GB before touching any
-# OMOP tables, preventing mid-ETL "transaction log full" failures.
+# This call shrinks space left over from prior runs and pre-grows the log
+# before touching any OMOP tables, preventing mid-ETL "transaction log full"
+# failures.
+#
+# HOW BIG. The 25 GB default was sized for two things: a vocabulary CSV load
+# (CONCEPT_ANCESTOR, 75 M rows) and create_source_to_standard_vocab_map, which
+# built the whole source->standard map from the ~6.3 M-concept vocabulary in a
+# single transaction.
+#
+#   - Loading vocabulary from CSV still needs the full 25 GB.
+#   - Using shared vocab maps, neither statement runs: vocabulary comes from
+#     synonyms and the map is built once in shared_map_schema. Measured, the
+#     remaining domain INSERTs never pushed the log past ~1.6 GB.
+#
+# Pre-growing to 25 GB regardless is not free — on a small VM disk it starves
+# the data file and the ETL dies at 99% full mid-load, which is a failure this
+# workspace has hit repeatedly. Size the request to the path actually taken.
 # ---------------------------------------------------------------------------
 source("R/db_maintenance.R")
-prepare_txlog_for_bulk_etl(cfg)
+
+txlog_target_mb <- if (isTRUE(reload_vocab_from_csv)) {
+  25600L   # full vocabulary CSV load — needs the original headroom
+} else if (isTRUE(use_shared_vocab_maps) && isTRUE(use_shared_vocab_schema)) {
+  4096L    # shared vocab + shared maps — only domain INSERTs are logged here
+} else {
+  16384L   # per-schema vocab maps still build in this database
+}
+message("Transaction log target : ", txlog_target_mb, " MB")
+prepare_txlog_for_bulk_etl(cfg, target_min_mb = txlog_target_mb)
 
 # Delegate actual ETL execution to the main ETLBuilder orchestration script.
 source("scripts/etl/run_synthea_full_csv_builder_etl.R")
@@ -271,6 +309,8 @@ run_synthea_full_csv_builder_etl(
   synthea_bulk_load        = synthea_bulk_load,
   use_shared_vocab_schema  = use_shared_vocab_schema,
   shared_vocab_schema      = shared_vocab_schema,
+  use_shared_vocab_maps    = use_shared_vocab_maps,
+  shared_map_schema        = shared_map_schema,
   verbose                  = verbose
 )
 
