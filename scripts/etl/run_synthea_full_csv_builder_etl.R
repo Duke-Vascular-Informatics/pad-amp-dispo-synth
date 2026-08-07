@@ -563,6 +563,39 @@ run_synthea_full_csv_builder_etl <- function(
   #     id is itself stable.  Upstream: OHDSI/ETL-Synthea v2.1.0 (e59d1c7),
   #     sql/sql_server/cdm_version/v5{31,40}/AllVisitTable.sql.
   #
+  #   AllVisitTable.sql / AAVITable.sql — urgent care encounters never reach the
+  #     CDM.  Synthea writes encounterclass 'urgentcare', but every rollup class
+  #     list in ETLSyntheaBuilder spells it 'urgent', which matches nothing: the
+  #     literal string 'urgent' appears zero times in Synthea output.  The result
+  #     is that urgentcare encounters — the fourth largest class, 11,568 of
+  #     160,697 on our reference run — are silently absent from visit_occurrence,
+  #     and every clinical event hanging off them lands in the CDM with a NULL
+  #     visit_occurrence_id (the event inserts LEFT JOIN final_visit_ids, so the
+  #     rows survive unlinked rather than being dropped).  That accounted for
+  #     418,318 of 1,916,924 measurements, 197,361 of 849,774 observations,
+  #     37,631 drug exposures, 25,299 procedures and 2,108 conditions.
+  #     That upstream intended these to flow through is visible in
+  #     insert_visit_occurrence.sql / insert_visit_detail.sql, which both carry a
+  #     "when 'urgentcare' then ..." branch that is unreachable as shipped.
+  #     The patch widens the two rollup class lists to include 'urgentcare'.
+  #     Additive and idempotent: the regex requires 'urgent' immediately before
+  #     the closing paren, so a rewritten list cannot re-match.
+  #
+  #   insert_visit_occurrence.sql / insert_visit_detail.sql — retarget the
+  #     urgentcare visit_concept_id from upstream's 9203 to 8782.
+  #     9203 is "Emergency Room Visit"; urgent care is not an emergency
+  #     department, and mapping it there is not a cosmetic difference here:
+  #     pad-amp-ed-desc's outcome cohort ([DVI] ED Visit, 1797944) matches
+  #     visit_concept_id 9203 exactly with includeDescendants = false, so
+  #     inheriting upstream's mapping would have silently inflated that study's
+  #     primary outcome from ~7,514 to ~19,082 visits and redefined it as
+  #     "ED or urgent care".  8782 = "Urgent Care Facility" [vocab query]
+  #     (CMS Place of Service, domain Visit, standard_concept = 'S', confirmed
+  #     against omop_vocab 2026-08-07); it is the only standard Visit-domain
+  #     urgent care concept — 38004265 (NUCC) and 42628635 (CPT4) are both
+  #     non-standard.  Only the 'urgentcare' branch is retargeted; the
+  #     'emergency' branch keeps 9203.
+  #
   #   insert_drug_era.sql — The generated query joins drug_exposure directly
   #     against concept_ancestor (75M rows), causing CXSYNC_PORT parallelism
   #     stalls that never complete on this instance.  This patch pre-materialises
@@ -627,6 +660,43 @@ run_synthea_full_csv_builder_etl <- function(
         sql,
         perl = TRUE
       )
+    }
+
+    # AllVisitTable.sql / AAVITable.sql: recover urgent care encounters.
+    # Widens the ER class lists from ('emergency','urgent') to include
+    # 'urgentcare', which is what Synthea actually emits.  Purely additive —
+    # 'urgent' is retained so the patch stays correct for any source that does
+    # use it.  AllVisitTable.sql has one such list (the ER_VISITS filter);
+    # AAVITable.sql has two (the encounter-side and visit-side class tests).
+    if (tolower(basename(file_path)) %in% c("allvisittable.sql", "aavitable.sql")) {
+      pat <- "(?i)\\(\\s*'emergency'\\s*,\\s*'urgent'\\s*\\)"
+      if (!grepl(pat, sql, perl = TRUE)) {
+        stop(
+          "urgentcare recovery patch did not match in ", file_path, ".\n",
+          "  Expected an (\'emergency\',\'urgent\') class list.  If ETLSyntheaBuilder\n",
+          "  has fixed the 'urgent' vs 'urgentcare' mismatch upstream, drop this\n",
+          "  patch; otherwise urgent care visits are silently missing from the CDM."
+        )
+      }
+      sql <- gsub(pat, "('emergency','urgent','urgentcare')", sql, perl = TRUE)
+    }
+
+    # insert_visit_occurrence.sql / insert_visit_detail.sql: map urgentcare to
+    # 8782 (Urgent Care Facility) rather than upstream's 9203 (Emergency Room
+    # Visit).  See the header note — 9203 here would silently widen any
+    # downstream ED-visit cohort that matches concept 9203 directly.
+    if (tolower(basename(file_path)) %in%
+        c("insert_visit_occurrence.sql", "insert_visit_detail.sql")) {
+      pat <- "(?i)when\\s+'urgentcare'\\s+then\\s+9203"
+      if (!grepl(pat, sql, perl = TRUE)) {
+        stop(
+          "urgentcare visit_concept_id patch did not match in ", file_path, ".\n",
+          "  Expected \"when 'urgentcare' then 9203\".  Check what concept\n",
+          "  ETLSyntheaBuilder now assigns before removing this patch — the point\n",
+          "  is to keep urgent care out of concept 9203 (Emergency Room Visit)."
+        )
+      }
+      sql <- sub(pat, "when 'urgentcare'  then 8782", sql, perl = TRUE)
     }
 
     # insert_drug_era.sql: the standard ETLSyntheaBuilder CTE chain references
@@ -922,10 +992,10 @@ run_synthea_full_csv_builder_etl <- function(
          FROM (
              SELECT *,
                  CASE
-                     WHEN encounterclass IN ('emergency', 'urgent') THEN
+                     WHEN encounterclass IN ('emergency', 'urgent', 'urgentcare') THEN
                          CASE
                              WHEN VISIT_TYPE = 'inpatient' AND VISIT_OCCURRENCE_ID_NEW IS NOT NULL THEN 1
-                             WHEN VISIT_TYPE IN ('emergency', 'urgent') AND VISIT_OCCURRENCE_ID_NEW IS NOT NULL THEN 2
+                             WHEN VISIT_TYPE IN ('emergency', 'urgent', 'urgentcare') AND VISIT_OCCURRENCE_ID_NEW IS NOT NULL THEN 2
                              ELSE 99
                          END
                      WHEN encounterclass IN ('ambulatory', 'wellness', 'outpatient') THEN
