@@ -62,8 +62,12 @@ source("R/connection.R")
 #   --min_open_revascularization_rows=<n>
 #   --min_outcome_condition_rows=<n>
 #   --min_mapped_condition_pct=<pct>
-#   --run_achilles=<true|false>     Run ACHILLES CDM profiling (default: false)
-#   --run_dqd=<true|false>          Run OHDSI Data Quality Dashboard (default: false)
+#   --run_achilles=<true|false>     Run ACHILLES CDM profiling (default: TRUE)
+#   --run_dqd=<true|false>          Run OHDSI Data Quality Dashboard (default: TRUE)
+#     NOTE: both default to TRUE in parse_args below. The comment previously
+#     said "false", which is worth knowing because each stage costs 10-60 min
+#     on a synthetic CDM — pass --run_achilles=false --run_dqd=false for a
+#     fast Step 6.
 #   --achilles_threads=<n>          Parallel threads for ACHILLES (default: 1)
 parse_args <- function(args) {
   opts <- list(
@@ -497,6 +501,89 @@ if (isTRUE(opts$enforce_thresholds)) {
 }
 
 # -----------------------------------------------------------------------------
+# Stage failure tracking
+# -----------------------------------------------------------------------------
+# 6b and 6c each wrap their work in tryCatch so that one failing profiler does
+# not abort the other. That is right, but on its own it made a failed stage
+# invisible: the script printed "QUALITY CHECK COMPLETE" and exited 0 even when
+# both stages had produced nothing. Record failures here and exit non-zero at
+# the end, so a workflow driver (or CI) actually notices.
+stage_failures <- character(0)
+
+record_stage_failure <- function(stage, message_text) {
+  stage_failures <<- c(stage_failures, paste0(stage, ": ", message_text))
+}
+
+# -----------------------------------------------------------------------------
+# ensure_results_schema
+#
+# Purpose:
+#   Create config$results_schema if it does not exist. ACHILLES and DQD both
+#   write tables there and both hard-fail on a missing schema — the error is
+#   "The specified schema name ... either does not exist or you do not have
+#   permission to use it", which reads like a permissions problem but is
+#   usually just an un-created schema on a fresh instance.
+#
+#   Unlike the CDM schema, nothing upstream creates this one: workflow/05 only
+#   creates the CDM and staging schemas, so a repo that has never run ACHILLES
+#   or DQD will not have it.
+#
+# Returns: invisibly TRUE if the schema exists (or was created), FALSE if it
+#          could not be created — in which case the caller should skip the
+#          stage and record a failure rather than let the profiler die deep
+#          inside its own SQL.
+# -----------------------------------------------------------------------------
+ensure_results_schema <- function() {
+  schema <- config$results_schema
+  exists_sql <- paste0(
+    "SELECT COUNT(*) AS n FROM sys.schemas WHERE name = '",
+    gsub("'", "''", schema), "';"
+  )
+  present <- tryCatch(
+    as.integer(run_query(exists_sql)$n[[1]]) > 0L,
+    error = function(e) NA
+  )
+  if (isTRUE(present)) {
+    return(invisible(TRUE))
+  }
+  if (is.na(present)) {
+    warning("[Step 6] Could not check for results schema '", schema, "'.")
+    return(invisible(FALSE))
+  }
+
+  message("[Step 6] Results schema '", schema, "' does not exist — creating it.")
+  created <- tryCatch({
+    conn_rs <- DatabaseConnector::connect(build_connection_details(config))
+    on.exit(DatabaseConnector::disconnect(conn_rs), add = TRUE)
+    DatabaseConnector::executeSql(
+      conn_rs,
+      paste0("IF SCHEMA_ID('", gsub("'", "''", schema), "') IS NULL ",
+             "EXEC('CREATE SCHEMA [", schema, "]');"),
+      progressBar = FALSE, reportOverallTime = FALSE
+    )
+    TRUE
+  }, error = function(e) {
+    warning("[Step 6] Could not create results schema '", schema, "': ",
+            conditionMessage(e))
+    FALSE
+  })
+  invisible(isTRUE(created))
+}
+
+# Create it once up front if either profiler is going to run.
+results_schema_ready <- TRUE
+if (isTRUE(opts$run_achilles) || isTRUE(opts$run_dqd)) {
+  results_schema_ready <- ensure_results_schema()
+  if (!results_schema_ready) {
+    record_stage_failure(
+      "Step 6",
+      paste0("results schema '", config$results_schema,
+             "' is missing and could not be created; ACHILLES/DQD skipped")
+    )
+  }
+}
+
+# -----------------------------------------------------------------------------
 # 6b. ACHILLES CDM profiling (optional — enable with --run_achilles=true)
 # -----------------------------------------------------------------------------
 # ACHILLES computes 170+ standardised analyses across every CDM domain and
@@ -506,7 +593,7 @@ if (isTRUE(opts$enforce_thresholds)) {
 #
 # Output folder: output/achilles/   (excluded from git via .gitignore)
 # Runtime: typically 10-30 min on a synthetic CDM of ~5,000 persons.
-if (isTRUE(opts$run_achilles)) {
+if (isTRUE(opts$run_achilles) && isTRUE(results_schema_ready)) {
   if (!requireNamespace("Achilles", quietly = TRUE)) {
     warning(
       "[Step 6b] Package 'Achilles' is not installed.\n",
@@ -535,6 +622,7 @@ if (isTRUE(opts$run_achilles)) {
       ),
       error = function(e) {
         warning("[Step 6b] ACHILLES failed: ", conditionMessage(e))
+        record_stage_failure("Step 6b (ACHILLES)", conditionMessage(e))
         NULL
       }
     )
@@ -573,7 +661,7 @@ if (isTRUE(opts$run_achilles)) {
 # Output file:   output/dqd/dqd_results.json
 # Results table: <results_schema>.dqdashboard_results
 # Runtime: typically 20-60 min on a synthetic CDM of ~5,000 persons.
-if (isTRUE(opts$run_dqd)) {
+if (isTRUE(opts$run_dqd) && isTRUE(results_schema_ready)) {
   if (!requireNamespace("DataQualityDashboard", quietly = TRUE)) {
     warning(
       "[Step 6c] Package 'DataQualityDashboard' is not installed.\n",
@@ -604,6 +692,7 @@ if (isTRUE(opts$run_dqd)) {
       ),
       error = function(e) {
         warning("[Step 6c] DQD failed: ", conditionMessage(e))
+        record_stage_failure("Step 6c (DQD)", conditionMessage(e))
       }
     )
 
@@ -635,6 +724,23 @@ if (isTRUE(opts$run_dqd)) {
     message("[Step 6c] DQD complete. Report: ", file.path(dqd_output, "dqd_results.json"))
     cat("\n")
   }
+}
+
+# -----------------------------------------------------------------------------
+# Exit status
+# -----------------------------------------------------------------------------
+# A stage that was requested and then failed is a hard failure, regardless of
+# --enforce_thresholds (which governs DATA thresholds, not stage execution).
+# Previously both were reported only via warning(), so Rscript still exited 0
+# and workflow/06 propagated success — a run where ACHILLES and DQD both died
+# on a missing results schema looked identical to a clean one.
+if (length(stage_failures) > 0) {
+  cat("\n=== QUALITY CHECK FAILED ===\n")
+  cat("The following stage(s) did not complete:\n")
+  for (f in stage_failures) cat("  - ", f, "\n", sep = "")
+  cat("\nCore checks above (Step 6a) may still be valid; the stages listed\n",
+      "here produced no output.\n", sep = "")
+  quit(status = 1L)
 }
 
 cat("=== QUALITY CHECK COMPLETE ===\n")
