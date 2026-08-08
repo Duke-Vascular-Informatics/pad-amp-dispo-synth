@@ -396,7 +396,8 @@ run_synthea_full_csv_builder_etl <- function(
     conn_cdm <- connect_with_retry(connection_details)
     on.exit(DatabaseConnector::disconnect(conn_cdm), add = TRUE)
 
-    required_cdm_tables <- c(
+    # Tables ETLSyntheaBuilder actually populates.
+    populated_cdm_tables <- c(
       "person", "location", "care_site", "provider",
       "observation_period", "visit_occurrence",
       "visit_detail", "condition_occurrence", "observation",
@@ -404,6 +405,26 @@ run_synthea_full_csv_builder_etl <- function(
       "condition_era", "drug_era", "cdm_source",
       "device_exposure", "death", "payer_plan_period", "cost"
     )
+
+    # CDM v5.4 clinical tables ETLSyntheaBuilder does NOT populate, but which a
+    # spec-complete CDM still has to expose — empty. ACHILLES and the Data
+    # Quality Dashboard query them unconditionally and hard-fail on
+    # "Invalid object name '<schema>.specimen'" (and .episode, .note, ...) when
+    # they are absent, which is how Step 6b/6c came to fail on every synthetic
+    # dataset in this workspace.
+    #
+    # Creating them costs nothing (empty tables) and makes the CDM conform to
+    # the published v5.4 spec rather than to the subset one ETL happens to fill.
+    #
+    # Deliberately EXCLUDED: cohort and cohort_definition. By OHDSI convention
+    # those live in the RESULTS schema (CohortGenerator writes them there), not
+    # the CDM schema.
+    unpopulated_cdm_tables <- c(
+      "note", "note_nlp", "specimen", "fact_relationship",
+      "dose_era", "episode", "episode_event", "metadata"
+    )
+
+    required_cdm_tables <- c(populated_cdm_tables, unpopulated_cdm_tables)
     missing_tables <- required_cdm_tables[!vapply(
       required_cdm_tables,
       function(tb) table_exists(conn_cdm, config$cdm_schema, tb),
