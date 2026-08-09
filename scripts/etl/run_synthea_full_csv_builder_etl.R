@@ -396,7 +396,8 @@ run_synthea_full_csv_builder_etl <- function(
     conn_cdm <- connect_with_retry(connection_details)
     on.exit(DatabaseConnector::disconnect(conn_cdm), add = TRUE)
 
-    required_cdm_tables <- c(
+    # Tables ETLSyntheaBuilder actually populates.
+    populated_cdm_tables <- c(
       "person", "location", "care_site", "provider",
       "observation_period", "visit_occurrence",
       "visit_detail", "condition_occurrence", "observation",
@@ -404,6 +405,26 @@ run_synthea_full_csv_builder_etl <- function(
       "condition_era", "drug_era", "cdm_source",
       "device_exposure", "death", "payer_plan_period", "cost"
     )
+
+    # CDM v5.4 clinical tables ETLSyntheaBuilder does NOT populate, but which a
+    # spec-complete CDM still has to expose — empty. ACHILLES and the Data
+    # Quality Dashboard query them unconditionally and hard-fail on
+    # "Invalid object name '<schema>.specimen'" (and .episode, .note, ...) when
+    # they are absent, which is how Step 6b/6c came to fail on every synthetic
+    # dataset in this workspace.
+    #
+    # Creating them costs nothing (empty tables) and makes the CDM conform to
+    # the published v5.4 spec rather than to the subset one ETL happens to fill.
+    #
+    # Deliberately EXCLUDED: cohort and cohort_definition. By OHDSI convention
+    # those live in the RESULTS schema (CohortGenerator writes them there), not
+    # the CDM schema.
+    unpopulated_cdm_tables <- c(
+      "note", "note_nlp", "specimen", "fact_relationship",
+      "dose_era", "episode", "episode_event", "metadata"
+    )
+
+    required_cdm_tables <- c(populated_cdm_tables, unpopulated_cdm_tables)
     missing_tables <- required_cdm_tables[!vapply(
       required_cdm_tables,
       function(tb) table_exists(conn_cdm, config$cdm_schema, tb),
@@ -539,13 +560,62 @@ run_synthea_full_csv_builder_etl <- function(
     invisible(NULL)
   }
 
-  # execute_sql_file() reads a SQL file, applies two SQL Server-specific patches
-  # for known ETLSyntheaBuilder syntax issues, then executes via
-  # execute_sql_with_retry().  Two files receive special treatment:
+  # execute_sql_file() reads a SQL file, applies SQL Server-specific patches
+  # for known ETLSyntheaBuilder defects, then executes via
+  # execute_sql_with_retry().  Three files receive special treatment:
   #
   #   insert_person.sql  — ETLSyntheaBuilder emits the non-standard
   #     "INSERT ... WITH CTE ... SELECT" form which SQL Server rejects.
   #     The regex below reorders it to the valid "WITH CTE ... INSERT ... SELECT".
+  #
+  #   AllVisitTable.sql  — ETLSyntheaBuilder assigns the surrogate
+  #     visit_occurrence_id with "row_number() over (order by patient)".
+  #     `patient` is non-unique (one row per visit, many visits per patient), so
+  #     the window has no total order and SQL Server is free to number tied rows
+  #     in any sequence.  Measured on a 140,684-row all_visits: re-running the
+  #     same statement under a different query plan reassigned the id for
+  #     124,044 rows.  Because downstream FINAL_VISIT_IDS dedup then breaks its
+  #     own ties on that id, an unstable numbering propagates into which visits
+  #     survive into visit_occurrence at all.  The patch appends a total-order
+  #     tie-break; encounter_id is unique within all_visits, so the resulting
+  #     ORDER BY is deterministic.  See the FINAL_VISIT_IDS note in
+  #     create_visit_rollup_tables_sql_server() for the companion fix — both are
+  #     required, since tie-breaking on visit_occurrence_id only helps once that
+  #     id is itself stable.  Upstream: OHDSI/ETL-Synthea v2.1.0 (e59d1c7),
+  #     sql/sql_server/cdm_version/v5{31,40}/AllVisitTable.sql.
+  #
+  #   AllVisitTable.sql / AAVITable.sql — urgent care encounters never reach the
+  #     CDM.  Synthea writes encounterclass 'urgentcare', but every rollup class
+  #     list in ETLSyntheaBuilder spells it 'urgent', which matches nothing: the
+  #     literal string 'urgent' appears zero times in Synthea output.  The result
+  #     is that urgentcare encounters — the fourth largest class, 11,568 of
+  #     160,697 on our reference run — are silently absent from visit_occurrence,
+  #     and every clinical event hanging off them lands in the CDM with a NULL
+  #     visit_occurrence_id (the event inserts LEFT JOIN final_visit_ids, so the
+  #     rows survive unlinked rather than being dropped).  That accounted for
+  #     418,318 of 1,916,924 measurements, 197,361 of 849,774 observations,
+  #     37,631 drug exposures, 25,299 procedures and 2,108 conditions.
+  #     That upstream intended these to flow through is visible in
+  #     insert_visit_occurrence.sql / insert_visit_detail.sql, which both carry a
+  #     "when 'urgentcare' then ..." branch that is unreachable as shipped.
+  #     The patch widens the two rollup class lists to include 'urgentcare'.
+  #     Additive and idempotent: the regex requires 'urgent' immediately before
+  #     the closing paren, so a rewritten list cannot re-match.
+  #
+  #   insert_visit_occurrence.sql / insert_visit_detail.sql — retarget the
+  #     urgentcare visit_concept_id from upstream's 9203 to 8782.
+  #     9203 is "Emergency Room Visit"; urgent care is not an emergency
+  #     department, and mapping it there is not a cosmetic difference here:
+  #     pad-amp-ed-desc's outcome cohort ([DVI] ED Visit, 1797944) matches
+  #     visit_concept_id 9203 exactly with includeDescendants = false, so
+  #     inheriting upstream's mapping would have silently inflated that study's
+  #     primary outcome from ~7,514 to ~19,082 visits and redefined it as
+  #     "ED or urgent care".  8782 = "Urgent Care Facility" [vocab query]
+  #     (CMS Place of Service, domain Visit, standard_concept = 'S', confirmed
+  #     against omop_vocab 2026-08-07); it is the only standard Visit-domain
+  #     urgent care concept — 38004265 (NUCC) and 42628635 (CPT4) are both
+  #     non-standard.  Only the 'urgentcare' branch is retargeted; the
+  #     'emergency' branch keeps 9203.
   #
   #   insert_drug_era.sql — The generated query joins drug_exposure directly
   #     against concept_ancestor (75M rows), causing CXSYNC_PORT parallelism
@@ -577,6 +647,77 @@ run_synthea_full_csv_builder_etl <- function(
           select_tail
         )
       }
+    }
+
+    # AllVisitTable.sql: make the surrogate visit_occurrence_id deterministic.
+    # Rewrites the single defective window clause
+    #     row_number()over(order by patient)
+    # into
+    #     row_number() over (order by patient, encounterclass,
+    #                        VISIT_START_DATE, encounter_id)
+    # which is a total order over all_visits (encounter_id is unique there),
+    # leaving the assigned ids identical from run to run.  The regex tolerates
+    # any whitespace around "over" and "(" so it keeps matching if upstream
+    # reformats the statement; if upstream ever changes the clause itself the
+    # match fails and we stop loudly rather than silently reverting to the
+    # nondeterministic behaviour.
+    if (tolower(basename(file_path)) == "allvisittable.sql") {
+      pat <- "(?i)row_number\\s*\\(\\s*\\)\\s*over\\s*\\(\\s*order\\s+by\\s+patient\\s*\\)"
+      if (!grepl(pat, sql, perl = TRUE)) {
+        stop(
+          "AllVisitTable.sql determinism patch did not match.\n",
+          "  Expected 'row_number()over(order by patient)' in ", file_path, ".\n",
+          "  ETLSyntheaBuilder may have changed this statement upstream — re-check\n",
+          "  that the visit_occurrence_id assignment still needs (or still has) a\n",
+          "  total ORDER BY before removing this guard."
+        )
+      }
+      sql <- sub(
+        pat,
+        paste0(
+          "row_number() over (order by patient, encounterclass, ",
+          "VISIT_START_DATE, encounter_id)"
+        ),
+        sql,
+        perl = TRUE
+      )
+    }
+
+    # AllVisitTable.sql / AAVITable.sql: recover urgent care encounters.
+    # Widens the ER class lists from ('emergency','urgent') to include
+    # 'urgentcare', which is what Synthea actually emits.  Purely additive —
+    # 'urgent' is retained so the patch stays correct for any source that does
+    # use it.  AllVisitTable.sql has one such list (the ER_VISITS filter);
+    # AAVITable.sql has two (the encounter-side and visit-side class tests).
+    if (tolower(basename(file_path)) %in% c("allvisittable.sql", "aavitable.sql")) {
+      pat <- "(?i)\\(\\s*'emergency'\\s*,\\s*'urgent'\\s*\\)"
+      if (!grepl(pat, sql, perl = TRUE)) {
+        stop(
+          "urgentcare recovery patch did not match in ", file_path, ".\n",
+          "  Expected an (\'emergency\',\'urgent\') class list.  If ETLSyntheaBuilder\n",
+          "  has fixed the 'urgent' vs 'urgentcare' mismatch upstream, drop this\n",
+          "  patch; otherwise urgent care visits are silently missing from the CDM."
+        )
+      }
+      sql <- gsub(pat, "('emergency','urgent','urgentcare')", sql, perl = TRUE)
+    }
+
+    # insert_visit_occurrence.sql / insert_visit_detail.sql: map urgentcare to
+    # 8782 (Urgent Care Facility) rather than upstream's 9203 (Emergency Room
+    # Visit).  See the header note — 9203 here would silently widen any
+    # downstream ED-visit cohort that matches concept 9203 directly.
+    if (tolower(basename(file_path)) %in%
+        c("insert_visit_occurrence.sql", "insert_visit_detail.sql")) {
+      pat <- "(?i)when\\s+'urgentcare'\\s+then\\s+9203"
+      if (!grepl(pat, sql, perl = TRUE)) {
+        stop(
+          "urgentcare visit_concept_id patch did not match in ", file_path, ".\n",
+          "  Expected \"when 'urgentcare' then 9203\".  Check what concept\n",
+          "  ETLSyntheaBuilder now assigns before removing this patch — the point\n",
+          "  is to keep urgent care out of concept 9203 (Emergency Room Visit)."
+        )
+      }
+      sql <- sub(pat, "when 'urgentcare'  then 8782", sql, perl = TRUE)
     }
 
     # insert_drug_era.sql: the standard ETLSyntheaBuilder CTE chain references
@@ -887,6 +1028,35 @@ run_synthea_full_csv_builder_etl <- function(
   # The final FINAL_VISIT_IDS step is re-implemented inline rather than from
   # a generated file to allow safe re-execution (IF OBJECT_ID ... DROP) and
   # to avoid hardcoded schema names in the generated output SQL.
+  #
+  # DETERMINISM: upstream ranks the candidate visits for an encounter with
+  # "ORDER BY PRIORITY" alone.  PRIORITY is a three-valued CASE (1/2/99), so
+  # ties are the norm, not the exception — on a 160,697-encounter Synthea run,
+  # 1,394 encounters had more than one DISTINCT candidate visit_occurrence_id
+  # at their minimum priority.  RN = 1 then picks whichever tied row the query
+  # plan happened to emit first.  That choice is not cosmetic: insert_visit_-
+  # occurrence.sql keeps only those all_visits rows that some encounter selected
+  # here (WHERE visit_occurrence_id IN (SELECT DISTINCT visit_occurrence_id_new
+  # ...)), so a different tie-break silently changes which visits exist in the
+  # CDM.  Measured across two query plans on identical input, upstream produced
+  # 139,591 vs 139,556 visit_occurrence rows with ~300 encounter UUIDs unique to
+  # each — i.e. the CDM was not reproducible even with the source CSVs frozen.
+  #
+  # The ORDER BY below is extended to a total order: prefer the earliest-
+  # starting then earliest-ending candidate visit (clinically the most defensible
+  # absorption target when an encounter falls inside more than one rolled-up
+  # visit), then fall back to the surrogate id to break anything still tied.
+  # This depends on the AllVisitTable.sql patch in execute_sql_file() — ordering
+  # on visit_occurrence_id_new is only stable once that id is itself stable.
+  #
+  # NOTE: making the tie-break deterministic also shifts the absolute row count
+  # (~139.2k rather than the ~139.6k the arbitrary ordering happened to yield),
+  # because a consistent winner concentrates encounters onto fewer distinct
+  # visits.  Any dataset registered in synthetic_data/registry.yaml before this
+  # change must be re-baselined rather than compared against its old counts.
+  #
+  # Upstream: OHDSI/ETL-Synthea v2.1.0 (e59d1c7),
+  # sql/sql_server/cdm_version/v5{31,40}/final_visit_ids.sql.
   create_visit_rollup_tables_sql_server <- function() {
     etl_sql_dir <- file.path(getwd(), "output")
     dir.create(etl_sql_dir, recursive = TRUE, showWarnings = FALSE)
@@ -912,14 +1082,20 @@ run_synthea_full_csv_builder_etl <- function(
        INTO @cdm_schema.FINAL_VISIT_IDS
        FROM (
          SELECT *,
-             ROW_NUMBER() OVER (PARTITION BY encounter_id ORDER BY PRIORITY) AS RN
+             ROW_NUMBER() OVER (
+                 PARTITION BY encounter_id
+                 ORDER BY PRIORITY,
+                          VISIT_START_DATE,
+                          VISIT_END_DATE,
+                          VISIT_OCCURRENCE_ID_NEW
+             ) AS RN
          FROM (
              SELECT *,
                  CASE
-                     WHEN encounterclass IN ('emergency', 'urgent') THEN
+                     WHEN encounterclass IN ('emergency', 'urgent', 'urgentcare') THEN
                          CASE
                              WHEN VISIT_TYPE = 'inpatient' AND VISIT_OCCURRENCE_ID_NEW IS NOT NULL THEN 1
-                             WHEN VISIT_TYPE IN ('emergency', 'urgent') AND VISIT_OCCURRENCE_ID_NEW IS NOT NULL THEN 2
+                             WHEN VISIT_TYPE IN ('emergency', 'urgent', 'urgentcare') AND VISIT_OCCURRENCE_ID_NEW IS NOT NULL THEN 2
                              ELSE 99
                          END
                      WHEN encounterclass IN ('ambulatory', 'wellness', 'outpatient') THEN

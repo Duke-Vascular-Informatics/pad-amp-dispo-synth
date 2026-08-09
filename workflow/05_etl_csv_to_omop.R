@@ -192,6 +192,184 @@ if (is.null(target_cdm_schema_base)) {
 }
 target_cdm_schema <- target_cdm_schema_base
 
+# ---------------------------------------------------------------------------
+# INTERLOCK — refuse to regenerate over a registry-pinned CDM schema.
+#
+# Step 5 runs with reset_before_etl = TRUE, which DROPS AND REBUILDS every table
+# in target_cdm_schema.  Several physical schemas in
+# ../synthetic_data/registry.yaml are pinned by downstream studies verified
+# against their exact counts, and at least one (pad_amp v1,
+# omop_synth_pad_amp_dispo) cannot be rebuilt at all: it predates the 2026-08-08
+# visit-rollup ETL fixes, and its generation_params.seed is null, so neither the
+# CDM nor the Synthea CSVs behind it are reproducible.  Overwriting one is
+# unrecoverable.  Until now the only thing preventing that was whoever edits
+# target_cdm_schema_base above reading the registry first; this makes it a hard
+# stop instead.
+#
+# SCOPE, AND ITS LIMITS.  This can only protect a version block declaring BOTH
+# physical_schema and a non-empty pinned_consumers.  Legacy single-block registry
+# entries record no physical schema at all, so they cannot be matched — they are
+# reported as unprotected rather than silently treated as safe.  Add a
+# physical_schema field to such an entry to bring it under the interlock.
+#
+# A version whose status is `needs_regeneration` is deliberately EXEMPT: the
+# registry is stating that this schema is meant to be rebuilt in place, and
+# blocking it would obstruct the one rebuild the interlock should allow.  The
+# run still prints a loud ALLOWED notice, because a rebuild invalidates the
+# pinned consumers' counts either way.
+#
+# DELIBERATE OVERRIDE (you are rebuilding a pinned schema on purpose):
+#   ALLOW_PINNED_CDM_SCHEMA=1 Rscript workflow/05_etl_csv_to_omop.R
+# ---------------------------------------------------------------------------
+
+# `%||%` is base R from 4.4.0; define it defensively so this guard also works
+# under an older R in a stale container image.
+if (!exists("%||%")) `%||%` <- function(x, y) if (is.null(x)) y else x
+
+# Walk up from start_dir looking for synthetic_data/registry.yaml.  Walking
+# rather than a fixed "../" keeps this correct when Step 5 runs from a git
+# worktree (.claude/worktrees/<name>) or any other nesting depth.  Returns
+# NA_character_ when the study repo is cloned standalone, without the workspace.
+find_synthetic_data_registry <- function(start_dir = getwd()) {
+  dir <- normalizePath(start_dir, winslash = "/", mustWork = FALSE)
+  repeat {
+    candidate <- file.path(dir, "synthetic_data", "registry.yaml")
+    if (file.exists(candidate)) {
+      return(candidate)
+    }
+    parent <- dirname(dir)
+    if (identical(parent, dir)) {
+      return(NA_character_)
+    }
+    dir <- parent
+  }
+}
+
+# Stop the run when `schema` is a physical schema some study is pinned to.
+# No-ops (with an explanatory message) when the registry cannot be found or
+# cannot be parsed — a missing workspace must not block a standalone clone from
+# building its own CDM, and this guard is a safety net, not a dependency.
+assert_target_schema_not_pinned <- function(schema) {
+  override <- tolower(trimws(Sys.getenv("ALLOW_PINNED_CDM_SCHEMA", unset = "")))
+  registry_path <- find_synthetic_data_registry()
+
+  if (is.na(registry_path)) {
+    message(
+      "[interlock] synthetic_data/registry.yaml not found above ", getwd(), ".\n",
+      "            Pinned-schema check SKIPPED (standalone clone?). ",
+      "Target: ", schema
+    )
+    return(invisible(FALSE))
+  }
+
+  registry <- tryCatch(yaml::read_yaml(registry_path), error = function(e) e)
+  if (inherits(registry, "error")) {
+    message(
+      "[interlock] Could not parse ", registry_path, ": ", conditionMessage(registry), "\n",
+      "            Pinned-schema check SKIPPED. Target: ", schema
+    )
+    return(invisible(FALSE))
+  }
+
+  # Collect every (schema, dataset, version, consumers) tuple the registry
+  # declares, plus the entries too old to declare one.
+  pinned <- list()
+  rebuildable <- list()
+  unprotected <- character(0)
+  for (dataset in registry$datasets %||% list()) {
+    if (is.null(dataset$versions)) {
+      unprotected <- c(unprotected, dataset$id %||% "<unnamed>")
+      next
+    }
+    for (v in dataset$versions) {
+      consumers <- unlist(v$pinned_consumers %||% list(), use.names = FALSE)
+      if (is.null(v$physical_schema) || !nzchar(v$physical_schema)) next
+      if (length(consumers) == 0) next
+      # A version the registry itself marks as needing regeneration is meant to
+      # be rebuilt in place — that is the whole point of the status.  Blocking it
+      # would make the interlock an obstacle to the one rebuild it should permit.
+      if (identical(tolower(v$status %||% ""), "needs_regeneration")) {
+        rebuildable[[length(rebuildable) + 1]] <- list(
+          schema = v$physical_schema, dataset = dataset$id %||% "<unnamed>",
+          version = v$version %||% "<unversioned>", consumers = consumers
+        )
+        next
+      }
+      pinned[[length(pinned) + 1]] <- list(
+        schema    = v$physical_schema,
+        dataset   = dataset$id %||% "<unnamed>",
+        version   = v$version %||% "<unversioned>",
+        consumers = consumers
+      )
+    }
+  }
+
+  # SQL Server identifiers are case-insensitive; compare accordingly.
+  hit <- Filter(function(p) tolower(p$schema) == tolower(schema), pinned)
+
+  if (length(hit) == 0) {
+    # Distinguish "unknown schema" from "pinned, but the registry says rebuild
+    # it" — the latter is a deliberate pass and should say so out loud, because
+    # it still invalidates the pinned consumers' counts.
+    allowed <- Filter(function(p) tolower(p$schema) == tolower(schema), rebuildable)
+    if (length(allowed) > 0) {
+      a <- allowed[[1]]
+      message(
+        "[interlock] ALLOWED — '", a$schema, "' (", a$dataset, " ", a$version,
+        ") is pinned by ", paste(a$consumers, collapse = ", "),
+        " but the registry marks it status: needs_regeneration, so an in-place\n",
+        "            rebuild is the intended action. Rebuild each consumer's ",
+        "overlay and re-verify its counts afterward."
+      )
+      return(invisible(TRUE))
+    }
+    message(
+      "[interlock] OK — '", schema, "' is not pinned by any registered dataset ",
+      "(", length(pinned), " pinned schema(s) checked",
+      if (length(unprotected)) paste0("; ", length(unprotected),
+        " legacy entr(y/ies) declare no physical_schema and cannot be checked: ",
+        paste(unprotected, collapse = ", ")) else "",
+      ")."
+    )
+    return(invisible(TRUE))
+  }
+
+  h <- hit[[1]]
+  detail <- paste0(
+    "  schema   : ", h$schema, "\n",
+    "  dataset  : ", h$dataset, " (", h$version, ")\n",
+    "  pinned by: ", paste(h$consumers, collapse = ", "), "\n",
+    "  registry : ", registry_path
+  )
+
+  if (override %in% c("1", "true", "yes")) {
+    message(
+      "[interlock] OVERRIDDEN via ALLOW_PINNED_CDM_SCHEMA — proceeding to ",
+      "REBUILD a pinned schema.\n", detail, "\n",
+      "            Every consumer above must have its overlay rebuilt and its ",
+      "counts re-verified after this run."
+    )
+    return(invisible(TRUE))
+  }
+
+  stop(
+    "Step 5 refused to run: the target CDM schema is PINNED by a registered dataset.\n\n",
+    detail, "\n\n",
+    "reset_before_etl drops and rebuilds every table in this schema, and a pinned\n",
+    "version is generally not reproducible (pre-2026-08-08 ETL and/or a null\n",
+    "generation seed), so overwriting it cannot be undone.\n\n",
+    "To add a version instead (the normal path): point target_cdm_schema_base in\n",
+    "workflow/05_etl_csv_to_omop.R at a NEW schema, e.g. omop_synth_<id>_v<N+1>,\n",
+    "add a matching version block to the registry, then migrate consumers one at a\n",
+    "time with synthetic_data/scripts/generate_overlay_schema.R.\n\n",
+    "If you really do intend to rebuild this schema in place:\n",
+    "  ALLOW_PINNED_CDM_SCHEMA=1 Rscript workflow/05_etl_csv_to_omop.R",
+    call. = FALSE
+  )
+}
+
+assert_target_schema_not_pinned(target_cdm_schema)
+
 # Derive run name from study name for consistent log/output labelling.
 if (is.null(run_name)) {
   run_name <- paste0(cfg$study_name, "-csv-", format(Sys.time(), "%Y%m%d-%H%M%S"))
