@@ -135,7 +135,12 @@ vocab_delimiter <- "\t"
 # Fresh CDM schema used only for ETLSyntheaBuilder-driven table lifecycle.
 # Derived from cfg$study_name after config loads: omop_synth_<study_name>.
 # Set to a non-NULL string here only to override the derived value.
-target_cdm_schema_base <- "omop_synth_pad_amp_dispo"  # PINNED override (NOT the
+target_cdm_schema_base <- "omop_synth_pad_amp_v2"  # v2 — VERSIONED target.
+  # CHANGED 2026-08-06 for pad_amp v2. The registry's versions: scheme requires a
+  # NEW physical schema per version rather than an in-place regeneration, because
+  # pad-amp-ed-desc and pad-amp-nhd-prog are PINNED to v1
+  # (omop_synth_pad_amp_dispo) and are merged/PRCC-verified against its counts.
+  # Do NOT point this back at the v1 schema.  # PINNED override (NOT the
   # study_name-derived omop_synth_pad_amp_dispo_synth). This -synth repo's study_name is
   # pad_amp_dispo_synth, but the physical CDM schema is intentionally the _desc name: it is
   # registered in ../synthetic_data/registry.yaml (id: pad_amp_dispo) and consumed by

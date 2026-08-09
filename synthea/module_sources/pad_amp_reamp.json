@@ -1,0 +1,944 @@
+{
+  "name": "PAD Amputation Re-amputation and Mortality — Synthetic Data Module (pad_amp v2)",
+  "remarks": [
+    "===========================================================================",
+    "PURPOSE",
+    "===========================================================================",
+    "Adds amputation PROGRESSION signal to the pad_amp dataset for pad-bka-aka-prog,",
+    "the external validation of AMPREDICT MoRe (Norvell et al., Eur J Vasc Endovasc",
+    "Surg 2025; DOI 10.1016/j.ejvs.2025.02.016).",
+    "",
+    "pad_amp v1 has ZERO re-amputation signal — all 198 index-amputation patients",
+    "have exactly one amputation date — and 1 year mortality of only 4.0%.",
+    "",
+    "===========================================================================",
+    "DESIGN: DISCRETE-TIME COMPETING RISKS, 12 MONTHLY SLICES",
+    "===========================================================================",
+    "REVISED 2026-08-06. An earlier draft sampled MoRe's four-category outcome up",
+    "front and then emitted events to match it. That was wrong, for three reasons:",
+    "",
+    "  1. COMPETING RISKS DISAPPEARED. A pre-assigned death-no-re-amputation",
+    "     patient was never AT RISK of re-amputation. In reality they were at risk",
+    "     and died first. So the data could not exercise censoring — and censoring",
+    "     is exactly what a cohort SQL gets wrong.",
+    "  2. THE TEMPORAL LOGIC BECAME UNTESTABLE. The whole point of this dataset is",
+    "     to test the 1-365 vs 22-365 day window distinction. Fixing the ANSWER at",
+    "     time zero made the windows decoration.",
+    "  3. IT WAS MORE COMPLEX, NOT LESS. In Synthea, module processing STOPS when a",
+    "     patient dies, so competing risks are free if events are allowed to play",
+    "     out. The earlier draft built routing to simulate what the engine does.",
+    "",
+    "So the four categories are now EMERGENT — a derived label checked in QC, not",
+    "an input. Each patient walks 12 monthly slices; in each slice a re-amputation",
+    "hazard fires, then a death hazard. Death ends the timeline on its own.",
+    "",
+    "===========================================================================",
+    "HAZARDS — SOLVED, not guessed. And they encode real DEPENDENCE.",
+    "===========================================================================",
+    "Solved 2026-08-06 against all four published cells simultaneously.",
+    "",
+    "⭐ THE INTERESTING FINDING: MoRe's published four-category split is NOT",
+    "consistent with INDEPENDENT hazards. Hazards tuned to hit both marginals",
+    "exactly (re-amputation 28.0%, death 19.4%) produce D/R = 3.3%, but MoRe",
+    "reports 5.1%. Re-amputation and death are therefore POSITIVELY DEPENDENT in",
+    "the real data — which is clinically expected: a re-amputation is both a marker",
+    "of severity and a surgical insult.",
+    "",
+    "Encoding that dependence as an elevated post-re-amputation death hazard fits",
+    "all four cells to within 0.09 percentage points TOTAL:",
+    "",
+    "  monthly re-amputation hazard, TT (base) : 0.0288",
+    "                                TM (1.40x): 0.0403",
+    "                                TF (0.60x): 0.0173",
+    "  monthly death hazard, no re-amputation  : 0.0156",
+    "  monthly death hazard, after re-amputation: 0.0289  (= 1.85x baseline)",
+    "",
+    "  EMERGENT                published",
+    "  ND/NR  57.7%            57.7%",
+    "  ND/R   22.9%            22.9%",
+    "  D/NR   14.3%            14.3%",
+    "  D/R     5.1%             5.1%",
+    "  marginals: re-amp 28.0% (28.0), death 19.4% (19.4)",
+    "",
+    "⚠️ TWO CAVEATS ON THOSE NUMBERS.",
+    "  * The LEVEL MULTIPLIERS (TM 1.40x, TT 1.00x, TF 0.60x) are a CLINICAL PRIOR,",
+    "    NOT published. MoRe does not report re-amputation by level. The direction",
+    "    is defensible — TM has the most room to progress and TF has nowhere higher",
+    "    to go within MoRe's levels — but the magnitudes are RESEARCHER_ADJUSTS.",
+    "    They are weighted by the published level mix (33.8/43.7/22.5) so the",
+    "    overall marginal holds whatever they are set to, but changing them shifts",
+    "    re-amputation BETWEEN levels.",
+    "  * The 1.85x dependence multiplier is INFERRED from the published joint",
+    "    distribution, not stated by MoRe. It is the value that reproduces D/R.",
+    "",
+    "COMPOSED-SYSTEM RESULT (300,000 patients, this module walked end to end with",
+    "pad_amp_index_sequence.json, 2026-08-06): ND/NR 57.75 · ND/R 22.72 ·",
+    "D/NR 14.43 · D/R 5.10, total error 0.37 pp; marginals 27.81% / 19.53%; level",
+    "mix TM 33.69 / TT 43.79 / TF 22.52. The index sequence needs NO hazard",
+    "re-solve — its branch (b) additions and branch (a) day-22 suppression nearly",
+    "cancel. ⚠️ ALWAYS re-simulate the COMPOSED system after a retune, never this",
+    "module alone: reasoning about the interaction in one direction got it wrong.",
+    "A finite real generation (~200 index patients) will still scatter around",
+    "these expectations — calibrate in Step 6 QC.",
+    "",
+    "===========================================================================",
+    "THE POINT: MAKE A WRONG COHORT SQL FAIL",
+    "===========================================================================",
+    "MoRe's level and re-amputation logic CANNOT be expressed in circe — it",
+    "classifies on TIMING and ANTECEDENT, not set membership (pad-bka-aka-prog",
+    "docs/MODEL_RECREATION.md §14 entry 17). That study must hand-author its cohort",
+    "SQL, and hand-authored cohort SQL is the riskiest code in it.",
+    "",
+    "So this module emits NEGATIVE CONTROLS alongside signal — events a naive",
+    "implementation will wrongly count. Each sets its own attribute so the",
+    "pre-flight can assert an exact expected count rather than eyeball a total.",
+    "If the pre-flight passes whether the SQL is right or wrong, the dataset failed.",
+    "",
+    "  (the early-second-code control lives in the base module as amp_second_code_early — renamed from amp_decoy_early_revision 2026-08-06 when the guillotine was dropped; it is now an AMBIGUOUS case, not a decoy.)",
+    "  amp_decoy_contralateral   correct timing, correct level, WRONG LIMB.",
+    "  amp_decoy_toe_or_ray      never an incident level and never 'same or higher'",
+    "                            than TM/TT/TF. Matters because the workspace's",
+    "                            minor_amputation set CONTAINS toe and ray, so SQL",
+    "                            built from that broad set rather than",
+    "                            forefoot_midfoot_amputation will over-count.",
+    "",
+    "===========================================================================",
+    "MoRe's RE-AMPUTATION DEFINITION, verbatim (Methods, 'Outcomes')",
+    "===========================================================================",
+    "'Re-amputation was identified by an amputation procedure code that occurred",
+    "1 - 365 days after the definitive incident amputation (or 22 - 365 days after",
+    "guillotine or disarticulation procedures to allow for revisions within three",
+    "weeks) and was ipsilateral to the incident procedure, had unknown laterality,",
+    "or was bilateral at the same or higher level than the incident amputation.'",
+    "",
+    "  1. TWO windows, not one — selected by amp_index_definitive.",
+    "  2. UNKNOWN laterality COUNTS, and so does BILATERAL. Only confirmed",
+    "     contralateral is excluded, so requiring ipsilateral UNDER-counts.",
+    "  3. SAME OR HIGHER level only.",
+    "  4. 'It is understood that re-amputation and death could only be counted if",
+    "     the re-amputation preceded death.' Now guaranteed by CONSTRUCTION: within",
+    "     a monthly slice the re-amputation check runs BEFORE the death check, and a",
+    "     dead patient never re-enters the loop.",
+    "",
+    "THREE SUB-TYPES, all counted:",
+    "  a. soft tissue revision       — TT and TF only",
+    "  b. re-amputation, same level  — TT and TF; for TM, ANY subsequent TM code",
+    "  c. definitive at higher level — TM->TT, TM->TF, TT->TF",
+    "  TM SPECIAL CASE, verbatim: 'Because TM amputations do not have codes for soft",
+    "  tissue revision or re-amputation at the same level, all TM codes after an",
+    "  incident TM amputation were coded as a subsequent TM amputation and",
+    "  classified as a re-amputation at the same level.' Note 'all TM codes' —",
+    "  BROADER than the ICD-9 84.3 route in §14 entry 18.",
+    "",
+    "===========================================================================",
+    "⛔ BASE-MODULE CONTRACT: THE GUILLOTINE SEQUENCE IS NOT IN THIS MODULE",
+    "===========================================================================",
+    "MOVED OUT 2026-08-06. An earlier version of this module emitted the guillotine",
+    "closure itself. That was wrong twice over:",
+    "",
+    "  1. WRONG CODE. It emitted SNOMED 180048002 'Revision coverage of amputation",
+    "     stump' (OMOP 4078404). A guillotine closure is NOT a stump revision — it is",
+    "     a SECOND DEFINITIVE AMPUTATION CODE AT THE SAME LEVEL. In claims the",
+    "     sequence is a BKA code and then another BKA code 1-2 weeks later (CPT 27882",
+    "     open/circular, then definitive 27880; in SNOMED, 88312006 twice).",
+    "     This also gutted the test: a stump-revision concept is an EASY decoy that a",
+    "     naive SQL may not even carry in its amputation set. Two IDENTICAL amputation",
+    "     codes separated only by timing is the dangerous case, and the one worth",
+    "     building.",
+    "",
+    "  2. WRONG PLACE. Per MoRe's Methods, the forward three-week search exists 'to",
+    "     classify the incident level' — so the closure DEFINES the index event rather",
+    "     than following it. A guillotine TT closed at TT is an incident TT; closed at",
+    "     TF, the incident level IS TF. That is index construction, which belongs to",
+    "     whichever module owns the index procedure. This module declares",
+    "     amp_index_level and amp_index_definitive as INPUTS — emitting the closure",
+    "     here contradicted its own interface.",
+    "",
+    "WHAT THE BASE MODULE MUST DO (all three branches — registry acceptance",
+    "criterion 2 requires them, and the old version implemented only the first):",
+    "",
+    "  a. CLOSURE WITHIN 3 WEEKS (days 1-21). Emit a second DEFINITIVE amputation",
+    "     code. That code sets amp_index_level:",
+    "        ~85-90%  same level as the guillotine   (TT -> TT, TF -> TF)",
+    "        ~10-15%  escalated at closure           (TT -> TF)",
+    "     Set amp_index_definitive = false, since MoRe's 22-365 day re-amputation",
+    "     window applies to these patients. Set amp_decoy_early_revision = true: the",
+    "     second code is part of the INDEX EVENT and must NOT count as a",
+    "     re-amputation. This is the strongest negative control in the dataset.",
+    "     ⚠️ Because escalation shifts the level mix toward TF, the base module's",
+    "     INITIAL level draw must be corrected so the FINAL mix still lands on the",
+    "     published 33.8 / 43.7 / 22.5.",
+    "",
+    "  b. CLOSURE AFTER 3 WEEKS (day 22+). MoRe: 'an error in the initial coding was",
+    "     presumed and the guillotine code was recoded as a definitive amputation.'",
+    "     So amp_index_level = the GUILLOTINE's level, amp_index_definitive = true,",
+    "     and the late closure is then ELIGIBLE as a re-amputation. Note this inverts",
+    "     branch (a): the same code at day 20 vs day 25 flips from index-event to",
+    "     outcome. That pair is the sharpest test of the two-window rule.",
+    "",
+    "  c. NO CLOSURE AT ALL. Same recoding as (b) — amp_index_definitive = true at the",
+    "     guillotine's level. MoRe states both branches; ref 10 states only the",
+    "     >3-week one, so an implementation matching ref 10 misses this.",
+    "",
+    "This module then handles ONLY the outcome side, and keeps the day-22 suppression",
+    "(Reamp_Window_Eligibility) because that is outcome logic, not index logic.",
+    "",
+    "===========================================================================",
+    "TWO OPEN PROBLEMS. READ BEFORE GENERATING.",
+    "===========================================================================",
+    "⛔ RESOLVED 2026-08-06: CPT4 CANNOT REACH THE CDM. THIS IS NOT AN OPEN QUESTION.",
+    "===========================================================================",
+    "The ETL check was run. CPT4 is blocked THREE independent ways:",
+    "",
+    "  1. ETLSyntheaBuilder's insert_procedure_occurrence.sql (v540) hard-codes",
+    "        and srctostdvm.target_vocabulary_id = 'SNOMED'",
+    "     unconditionally, and restricts the SOURCE vocabulary to 'SNOMED' (Synthea",
+    "     2.7.0-3.2.0) or 'SNOMED','HCPCS' (3.3.0). CPT4 is never an accepted source.",
+    "  2. CPT 27882 and 27592 have a 'Maps to' relationship ONLY TO THEMSELVES",
+    "     (CPT4 -> CPT4). There is no SNOMED target, so relaxing the source filter",
+    "     alone would still not let them through the target filter.",
+    "  3. No HCPCS concept exists with code 27882 or 27592 — both codes resolve only",
+    "     to CPT4 concepts — so the Synthea 3.3.0 HCPCS branch does not help either.",
+    "",
+    "And there is no SNOMED substitute. A search of SNOMED Procedure concepts for",
+    "open / staged / circular / guillotine amputation returns nothing appropriate; the",
+    "nearest hits (4204692 'Reamputation', 40479688 'Reamputation of lower leg through",
+    "tibia and fibula') mean RE-amputation, not an open index amputation, and would be",
+    "semantically wrong here.",
+    "",
+    "CONSEQUENCE. The guillotine branch can still be BUILT in pad-bka-aka-prog's cohort",
+    "SQL — real Duke data carries CPT — but it CANNOT BE VALIDATED against this",
+    "synthetic dataset as the pipeline stands. Registry acceptance criterion 2 is",
+    "therefore unmeetable as written, and that must be declared rather than quietly",
+    "dropped.",
+    "",
+    "THREE WAYS FORWARD, in order of preference:",
+    "  (i)  POST-ETL INJECTION (recommended). After Step 5, insert the guillotine",
+    "       procedure_occurrence rows directly, keyed off a Synthea-emitted marker.",
+    "       This mirrors the pattern pad-amp-nhd-prog already uses for its non-home",
+    "       discharge cohort — hand-authored SQL applied after the standard machinery —",
+    "       needs no HADES patch, and survives renv::restore().",
+    "  (ii) PATCH ETLSyntheaBuilder to allow target_vocabulary_id IN ('SNOMED','CPT4').",
+    "       Works, but it is a package-cache patch and is LOST on every",
+    "       renv::restore(), exactly like the Characterization attr_reason patch.",
+    "  (iii) DROP the guillotine arm and declare criterion 2 unmet. Cheapest, and",
+    "       leaves the two-window rule and the day-20-vs-day-25 flip untested.",
+    "",
+    "⚠️ DO NOT substitute a definitive SNOMED code for the guillotine. That converts",
+    "every guillotine patient into a definitive one, makes the 22-365 day window and",
+    "branch (b) unconstructible, and yields a PASSING pre-flight that tests nothing.",
+    "",
+    "===========================================================================",
+    "REQUIRED INPUT ATTRIBUTES (set by the base/index module)",
+    "===========================================================================",
+    "  amp_index_level      'TM' | 'TT' | 'TF'  incident level (mix 33.8/43.7/22.5)",
+    "  amp_index_definitive true | false        false = guillotine/disarticulation",
+    "                                           index, selecting the 22-365 window",
+    "OUTPUT ATTRIBUTES, for the QC queries:",
+    "  amp_month, amp_reamp_occurred, amp_reamp_subtype, amp_reamp_laterality,",
+    "  amp_death_1y, amp_decoy_early_revision, amp_decoy_contralateral,",
+    "  amp_decoy_toe_or_ray",
+    "",
+    "TODO [COMPOSE] Module composition is not wired (Step 3 hard-fails on extra",
+    "workspace-authored modules; Step 4 runs Synthea with no -m filter), so merge",
+    "these states into pad_amp_dispo.json as a sub-graph for now. EXACTLY ONE",
+    "module may own the index procedure — two owners caused the v1 379->196",
+    "inflation.",
+    "==========================================================================="
+  ],
+  "states": {
+    "Initial": {
+      "type": "Initial",
+      "direct_transition": "Index_Attributes_Guard"
+    },
+    "Index_Attributes_Guard": {
+      "type": "Guard",
+      "remarks": [
+        "Only patients with an incident amputation enter. Fails CLOSED: if the base",
+        "module did not set amp_index_level, nothing fires and no spurious",
+        "progression is emitted."
+      ],
+      "allow": {
+        "condition_type": "Attribute",
+        "attribute": "amp_index_level",
+        "operator": "is not nil"
+      },
+      "direct_transition": "Init_Month_Counter"
+    },
+    "Init_Month_Counter": {
+      "type": "SetAttribute",
+      "attribute": "amp_month",
+      "value": 0,
+      "direct_transition": "Init_Reamp_Flag"
+    },
+    "Init_Reamp_Flag": {
+      "type": "SetAttribute",
+      "remarks": [
+        "Explicit false rather than nil, so the QC query can distinguish 'checked, did not happen' from 'never evaluated'."
+      ],
+      "attribute": "amp_reamp_occurred",
+      "value": false,
+      "direct_transition": "Month_Tick"
+    },
+    "Month_Tick": {
+      "type": "Counter",
+      "remarks": [
+        "Slice 1..12. The loop exit tests amp_month >= 12."
+      ],
+      "attribute": "amp_month",
+      "action": "increment",
+      "direct_transition": "Month_Delay"
+    },
+    "Month_Delay": {
+      "type": "Delay",
+      "remarks": [
+        "One monthly slice. 30-31 days, so 12 slices span ~360-372 days rather than",
+        "exactly 365. That JITTER IS DELIBERATE: it puts some events either side of",
+        "the day-365 boundary, which is precisely where an off-by-one in the cohort",
+        "SQL shows up. A fixed 30 days would total 360 and never test the boundary.",
+        "⚠️ Consequence for QC: a small number of month-12 events land after day 365",
+        "and must NOT be counted. The QC query has to assert that, not assume it."
+      ],
+      "range": {
+        "low": 30,
+        "high": 31,
+        "unit": "days"
+      },
+      "direct_transition": "Reamp_Already_Occurred_Check"
+    },
+    "Reamp_Already_Occurred_Check": {
+      "type": "Simple",
+      "remarks": [
+        "MoRe's outcome is BINARY 'any re-amputation', so once a patient has one",
+        "there is nothing more to detect and further re-amputation checks are",
+        "skipped. Death hazard continues — at the ELEVATED rate."
+      ],
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "amp_reamp_occurred",
+            "operator": "==",
+            "value": true
+          },
+          "transition": "Death_Hazard_After_Reamp"
+        },
+        {
+          "transition": "Reamp_Level_Router"
+        }
+      ]
+    },
+    "Reamp_Level_Router": {
+      "type": "Simple",
+      "remarks": [
+        "Per-level monthly hazard. Level multipliers are a CLINICAL PRIOR, not",
+        "published — see the header. Weighted by the published level mix so the",
+        "overall 28.0% marginal holds regardless of how they are tuned."
+      ],
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "amp_index_level",
+            "operator": "==",
+            "value": "TM"
+          },
+          "transition": "TM_Monthly_Reamp_Hazard"
+        },
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "amp_index_level",
+            "operator": "==",
+            "value": "TT"
+          },
+          "transition": "TT_Monthly_Reamp_Hazard"
+        },
+        {
+          "transition": "TF_Monthly_Reamp_Hazard"
+        }
+      ]
+    },
+    "TM_Monthly_Reamp_Hazard": {
+      "type": "Simple",
+      "remarks": [
+        "TM: 0.0403/month (1.40x base). Most room to progress. RESEARCHER_ADJUSTS."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.0403,
+          "transition": "Reamp_Window_Eligibility"
+        },
+        {
+          "distribution": 0.9597,
+          "transition": "Death_Hazard_Baseline"
+        }
+      ]
+    },
+    "TT_Monthly_Reamp_Hazard": {
+      "type": "Simple",
+      "remarks": [
+        "TT: 0.0288/month — the solved base rate."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.0288,
+          "transition": "Reamp_Window_Eligibility"
+        },
+        {
+          "distribution": 0.9712,
+          "transition": "Death_Hazard_Baseline"
+        }
+      ]
+    },
+    "TF_Monthly_Reamp_Hazard": {
+      "type": "Simple",
+      "remarks": [
+        "TF: 0.0173/month (0.60x base). No higher LE level exists within MoRe's scheme. RESEARCHER_ADJUSTS."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.0173,
+          "transition": "Reamp_Window_Eligibility"
+        },
+        {
+          "distribution": 0.9827,
+          "transition": "Death_Hazard_Baseline"
+        }
+      ]
+    },
+    "Reamp_Window_Eligibility": {
+      "type": "Simple",
+      "remarks": [
+        "THE TWO-WINDOW RULE, applied where it actually bites. In month 1 a",
+        "GUILLOTINE/disarticulation index is still inside MoRe's day 1-21 exclusion,",
+        "so a hazard draw here is SUPPRESSED — not eligible yet, and no event is",
+        "emitted. From month 2 onward (day >= 30) both windows are open.",
+        "A definitive index has no exclusion, so month 1 counts normally.",
+        "This is the state that makes a single-window implementation detectable."
+      ],
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "And",
+            "conditions": [
+              {
+                "condition_type": "Attribute",
+                "attribute": "amp_index_definitive",
+                "operator": "==",
+                "value": false
+              },
+              {
+                "condition_type": "Attribute",
+                "attribute": "amp_month",
+                "operator": "<=",
+                "value": 1
+              }
+            ]
+          },
+          "transition": "Death_Hazard_Baseline"
+        },
+        {
+          "transition": "Reamp_Subtype_Router"
+        }
+      ]
+    },
+    "Reamp_Subtype_Router": {
+      "type": "Simple",
+      "remarks": [
+        "Sub-type availability depends on the INCIDENT level — the crux of MoRe's",
+        "algorithm. TM has NO soft-tissue-revision or same-level codes, so any",
+        "subsequent TM code IS the same-level re-amputation. TF has no higher level.",
+        "A single sub-type router for all levels would emit TT-only codes for TM",
+        "patients and silently make the TM stratum unvalidatable."
+      ],
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "amp_index_level",
+            "operator": "==",
+            "value": "TM"
+          },
+          "transition": "TM_Reamp_Subtype"
+        },
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "amp_index_level",
+            "operator": "==",
+            "value": "TT"
+          },
+          "transition": "TT_Reamp_Subtype"
+        },
+        {
+          "transition": "TF_Reamp_Subtype"
+        }
+      ]
+    },
+    "TM_Reamp_Subtype": {
+      "type": "Simple",
+      "remarks": [
+        "RESEARCHER_ADJUSTS. Both arms must stay non-trivial or the 'all TM codes count' rule is never exercised."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.55,
+          "transition": "Reamp_TM_Same_Level"
+        },
+        {
+          "distribution": 0.45,
+          "transition": "Reamp_TM_To_Higher"
+        }
+      ]
+    },
+    "TT_Reamp_Subtype": {
+      "type": "Simple",
+      "remarks": [
+        "All three sub-types available. RESEARCHER_ADJUSTS."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.3,
+          "transition": "Reamp_Soft_Tissue_Revision"
+        },
+        {
+          "distribution": 0.35,
+          "transition": "Reamp_TT_Same_Level"
+        },
+        {
+          "distribution": 0.35,
+          "transition": "Reamp_TT_To_TF"
+        }
+      ]
+    },
+    "TF_Reamp_Subtype": {
+      "type": "Simple",
+      "remarks": [
+        "No higher LE level above TF in MoRe's scheme, so revision and same-level only. This asymmetry is real."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.45,
+          "transition": "Reamp_Soft_Tissue_Revision"
+        },
+        {
+          "distribution": 0.55,
+          "transition": "Reamp_TF_Same_Level"
+        }
+      ]
+    },
+    "Reamp_Soft_Tissue_Revision": {
+      "type": "Procedure",
+      "remarks": [
+        "Sub-type (a). SNOMED-CT 180048002 -> OMOP 4078404 [vocab query 2026-08-06,",
+        "standard, Procedure]. Also the 'Maps to' target of ICD-9 84.3, the revision",
+        "code MoRe's ref 11 used. TT/TF only — TM bypasses this state."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "180048002",
+          "display": "Revision coverage of amputation stump [vocab query — OMOP 4078404]"
+        }
+      ],
+      "duration": {
+        "low": 45,
+        "high": 120,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Reamp_Subtype_SoftTissue"
+    },
+    "Reamp_TM_Same_Level": {
+      "type": "Procedure",
+      "remarks": [
+        "Sub-type (b), TM special case. SNOMED-CT 265739006 -> OMOP 4143797 [vocab query 2026-08-06]. Catalog: forefoot_midfoot_amputation, [DVI] 1891165."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "265739006",
+          "display": "Amputation through metatarsal bones [vocab query — OMOP 4143797]"
+        }
+      ],
+      "duration": {
+        "low": 60,
+        "high": 150,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Reamp_Subtype_SameLevel"
+    },
+    "Reamp_TT_Same_Level": {
+      "type": "Procedure",
+      "remarks": [
+        "Sub-type (b), TT. SNOMED-CT 88312006 -> OMOP 4338257 [vocab query 2026-08-06]."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "88312006",
+          "display": "Amputation of leg through tibia and fibula [vocab query — OMOP 4338257]"
+        }
+      ],
+      "duration": {
+        "low": 90,
+        "high": 180,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Reamp_Subtype_SameLevel"
+    },
+    "Reamp_TF_Same_Level": {
+      "type": "Procedure",
+      "remarks": [
+        "Sub-type (b), TF. SNOMED-CT 79733001 -> OMOP 4195136 [vocab query 2026-08-06]."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "79733001",
+          "display": "Amputation above-knee [vocab query — OMOP 4195136]"
+        }
+      ],
+      "duration": {
+        "low": 120,
+        "high": 210,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Reamp_Subtype_SameLevel"
+    },
+    "Reamp_TM_To_Higher": {
+      "type": "Simple",
+      "remarks": [
+        "Sub-type (c) from TM. RESEARCHER_ADJUSTS — TM usually progresses to TT rather than straight to TF."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.75,
+          "transition": "Reamp_Higher_TT"
+        },
+        {
+          "distribution": 0.25,
+          "transition": "Reamp_Higher_TF"
+        }
+      ]
+    },
+    "Reamp_Higher_TT": {
+      "type": "Procedure",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "88312006",
+          "display": "Amputation of leg through tibia and fibula [vocab query — OMOP 4338257]"
+        }
+      ],
+      "duration": {
+        "low": 90,
+        "high": 180,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Reamp_Subtype_Higher"
+    },
+    "Reamp_TT_To_TF": {
+      "type": "Procedure",
+      "remarks": [
+        "The canonical progression MoRe cites (TT -> TF)."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "79733001",
+          "display": "Amputation above-knee [vocab query — OMOP 4195136]"
+        }
+      ],
+      "duration": {
+        "low": 120,
+        "high": 210,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Reamp_Subtype_Higher"
+    },
+    "Reamp_Higher_TF": {
+      "type": "Procedure",
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "79733001",
+          "display": "Amputation above-knee [vocab query — OMOP 4195136]"
+        }
+      ],
+      "duration": {
+        "low": 120,
+        "high": 210,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Reamp_Subtype_Higher"
+    },
+    "Set_Reamp_Subtype_SoftTissue": {
+      "type": "SetAttribute",
+      "attribute": "amp_reamp_subtype",
+      "value": "soft_tissue_revision",
+      "direct_transition": "Set_Reamp_Occurred"
+    },
+    "Set_Reamp_Subtype_SameLevel": {
+      "type": "SetAttribute",
+      "attribute": "amp_reamp_subtype",
+      "value": "same_level",
+      "direct_transition": "Set_Reamp_Occurred"
+    },
+    "Set_Reamp_Subtype_Higher": {
+      "type": "SetAttribute",
+      "attribute": "amp_reamp_subtype",
+      "value": "higher_level",
+      "direct_transition": "Set_Reamp_Occurred"
+    },
+    "Set_Reamp_Occurred": {
+      "type": "SetAttribute",
+      "remarks": [
+        "Ground truth for QC: compare against what the cohort SQL detects, per sub-type and per level."
+      ],
+      "attribute": "amp_reamp_occurred",
+      "value": true,
+      "direct_transition": "Reamp_Laterality_Mix"
+    },
+    "Reamp_Laterality_Mix": {
+      "type": "Simple",
+      "remarks": [
+        "MoRe counts IPSILATERAL, UNKNOWN, or BILATERAL. Only confirmed",
+        "contralateral is excluded, so an implementation requiring ipsilateral",
+        "UNDER-counts — hence the unknown and bilateral arms exist to catch that.",
+        "⚠️ TODO [ETL]: Synthea emits no laterality, so these arms are documentation",
+        "of intent until the ETL populates a modifier. RESEARCHER_ADJUSTS."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.8,
+          "transition": "Set_Reamp_Lat_Ipsilateral"
+        },
+        {
+          "distribution": 0.15,
+          "transition": "Set_Reamp_Lat_Unknown"
+        },
+        {
+          "distribution": 0.05,
+          "transition": "Set_Reamp_Lat_Bilateral"
+        }
+      ]
+    },
+    "Set_Reamp_Lat_Ipsilateral": {
+      "type": "SetAttribute",
+      "attribute": "amp_reamp_laterality",
+      "value": "ipsilateral",
+      "direct_transition": "Death_Hazard_After_Reamp"
+    },
+    "Set_Reamp_Lat_Unknown": {
+      "type": "SetAttribute",
+      "attribute": "amp_reamp_laterality",
+      "value": "unknown",
+      "direct_transition": "Death_Hazard_After_Reamp"
+    },
+    "Set_Reamp_Lat_Bilateral": {
+      "type": "SetAttribute",
+      "attribute": "amp_reamp_laterality",
+      "value": "bilateral",
+      "direct_transition": "Death_Hazard_After_Reamp"
+    },
+    "Death_Hazard_Baseline": {
+      "type": "Simple",
+      "remarks": [
+        "Monthly death hazard for patients with NO re-amputation yet: 0.0156.",
+        "Runs AFTER the re-amputation check in the same slice, which is what makes",
+        "MoRe's 'the re-amputation preceded death' constraint structural."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.0053,
+          "transition": "Set_Death_1y"
+        },
+        {
+          "distribution": 0.9947,
+          "transition": "Decoy_Hazard_Check"
+        }
+      ]
+    },
+    "Death_Hazard_After_Reamp": {
+      "type": "Simple",
+      "remarks": [
+        "ELEVATED monthly death hazard after a re-amputation: 0.0289 = 1.85x the",
+        "0.0156 baseline. This multiplier is what reproduces MoRe's D/R cell (5.1%);",
+        "independent hazards give only 3.3%. INFERRED from the published joint",
+        "distribution, not stated by MoRe — see the header."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.0098,
+          "transition": "Set_Death_1y"
+        },
+        {
+          "distribution": 0.9902,
+          "transition": "Decoy_Hazard_Check"
+        }
+      ]
+    },
+    "Death_State": {
+      "type": "Death",
+      "remarks": [
+        "Sets death_date, which the ETL writes to the OMOP death table. Synthea",
+        "STOPS module processing here — which is precisely why competing risks now",
+        "work for free: a patient who dies never re-enters the monthly loop and so",
+        "is correctly no longer at risk of re-amputation."
+      ],
+      "direct_transition": "Terminal"
+    },
+    "Set_Death_1y": {
+      "type": "SetAttribute",
+      "attribute": "amp_death_1y",
+      "value": true,
+      "direct_transition": "Death_State"
+    },
+    "Decoy_Hazard_Check": {
+      "type": "Simple",
+      "remarks": [
+        "NEGATIVE CONTROLS, emitted as a small monthly hazard so they spread across",
+        "the year like real events, while each still sets an attribute so QC can",
+        "assert an exact expected count. ~1.5%/month gives roughly 1 in 6 patients",
+        "at least one decoy over 12 months. RESEARCHER_ADJUSTS."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.009,
+          "transition": "Decoy_Contralateral_Procedure"
+        },
+        {
+          "distribution": 0.006,
+          "transition": "Decoy_Toe_Or_Ray_Subtype"
+        },
+        {
+          "distribution": 0.985,
+          "transition": "Month_Loop_Check"
+        }
+      ]
+    },
+    "Decoy_Contralateral_Procedure": {
+      "type": "Procedure",
+      "remarks": [
+        "DECOY 2 — correct timing, correct level, WRONG LIMB. MoRe excludes only",
+        "confirmed contralateral events.",
+        "⚠️ TODO [ETL]: without emitted laterality this is indistinguishable from a",
+        "real ipsilateral re-amputation and will read as a false positive that looks",
+        "like a SQL bug. Resolve before scoring this control."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "88312006",
+          "display": "Amputation of leg through tibia and fibula [vocab query — OMOP 4338257]"
+        }
+      ],
+      "duration": {
+        "low": 90,
+        "high": 180,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Decoy_Contralateral"
+    },
+    "Set_Decoy_Contralateral": {
+      "type": "SetAttribute",
+      "attribute": "amp_decoy_contralateral",
+      "value": true,
+      "direct_transition": "Month_Loop_Check"
+    },
+    "Decoy_Toe_Or_Ray_Subtype": {
+      "type": "Simple",
+      "remarks": [
+        "DECOY 3 — toe or ray amputation. Neither is an incident level for MoRe",
+        "(TM/TT/TF only) and neither is 'same or higher' than any of them.",
+        "This control exists because the workspace's minor_amputation set CONTAINS",
+        "toe and ray, so SQL built from that broad set rather than",
+        "forefoot_midfoot_amputation ([DVI] 1891165) will wrongly count these.",
+        "See catalog toe_amputation ([DVI] 1891164)."
+      ],
+      "distributed_transition": [
+        {
+          "distribution": 0.6,
+          "transition": "Decoy_Toe_Procedure"
+        },
+        {
+          "distribution": 0.4,
+          "transition": "Decoy_Ray_Procedure"
+        }
+      ]
+    },
+    "Decoy_Toe_Procedure": {
+      "type": "Procedure",
+      "remarks": [
+        "SNOMED-CT 371186005 -> OMOP 4159766 [vocab query 2026-08-06]. In toe_amputation, NOT in forefoot_midfoot_amputation."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "371186005",
+          "display": "Amputation of toe [vocab query — OMOP 4159766]"
+        }
+      ],
+      "duration": {
+        "low": 20,
+        "high": 60,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Decoy_Toe_Ray"
+    },
+    "Decoy_Ray_Procedure": {
+      "type": "Procedure",
+      "remarks": [
+        "SNOMED-CT 405443002 -> OMOP 4226945 [vocab query 2026-08-06]. A ray removes",
+        "ONE metatarsal with its toe, so it is NOT transmetatarsal (which requires",
+        "removal of ALL toes) — verified 2026-08-06 that 4226945 is a SIBLING of both",
+        "the toe and TMA anchors, not a descendant of either."
+      ],
+      "codes": [
+        {
+          "system": "SNOMED-CT",
+          "code": "405443002",
+          "display": "Ray amputation of foot [vocab query — OMOP 4226945]"
+        }
+      ],
+      "duration": {
+        "low": 30,
+        "high": 75,
+        "unit": "minutes"
+      },
+      "direct_transition": "Set_Decoy_Toe_Ray"
+    },
+    "Set_Decoy_Toe_Ray": {
+      "type": "SetAttribute",
+      "attribute": "amp_decoy_toe_or_ray",
+      "value": true,
+      "direct_transition": "Month_Loop_Check"
+    },
+    "Month_Loop_Check": {
+      "type": "Simple",
+      "remarks": [
+        "Twelve slices, then stop. Patients who reach here alive at month 12 are the",
+        "ND/NR and ND/R strata; the four-category label is DERIVED in QC from",
+        "amp_reamp_occurred x amp_death_1y rather than assigned anywhere here."
+      ],
+      "conditional_transition": [
+        {
+          "condition": {
+            "condition_type": "Attribute",
+            "attribute": "amp_month",
+            "operator": "<",
+            "value": 12
+          },
+          "transition": "Month_Tick"
+        },
+        {
+          "transition": "Terminal"
+        }
+      ]
+    },
+    "Terminal": {
+      "type": "Terminal"
+    }
+  }
+}

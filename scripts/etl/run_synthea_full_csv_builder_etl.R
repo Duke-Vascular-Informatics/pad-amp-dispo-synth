@@ -735,6 +735,85 @@ run_synthea_full_csv_builder_etl <- function(
     #   4. Materializes #final_target (sub-exposure grouping) with index
     #   5. Computes final era into #tmp_de and inserts into drug_era
     # Each step reads its input exactly once; total runtime ~1-2 minutes.
+    # insert_death.sql: recover module-driven deaths.
+    #
+    # Back-ports synthea-omop-template#84. Upstream reads deaths ONLY from
+    # synthea.encounters where code = '308646001' (the SNOMED death-certification
+    # encounter) and never reads patients.deathdate. Synthea emits that encounter
+    # from its own LIFECYCLE mortality; a Death state fired by a workspace module
+    # sets the death date but generates no such encounter, so every module-driven
+    # death is structurally invisible to the CDM.
+    #
+    # Measured on this repo's pad_amp v2 CSVs: 676 patients carry a DEATHDATE but
+    # only 540 have a certification encounter, and in the amputation cohort 229
+    # died against 102 with an encounter — 55% dropped. 1-year mortality after
+    # index amputation read 29.6% in the CSVs and 2.5% in the CDM, which was
+    # recorded in the registry as a broken module hazard when the hazards were
+    # correct and the ETL was lossy.
+    #
+    # Recovered rows carry cause 0 — Synthea records no cause for them anywhere.
+    # death_type_concept_id reuses upstream's 32817 so no unverified concept ID
+    # enters the pipeline (Rule 1). Idempotent via the DEATH_RECOVERY_PATCH
+    # marker; the trailing-semicolon regex alone is not, since the rewritten SQL
+    # still ends in ";".
+    if (tolower(basename(file_path)) == "insert_death.sql" &&
+        !grepl("DEATH_RECOVERY_PATCH", sql, fixed = TRUE)) {
+      cdm <- config$cdm_schema
+      # synthea.patients date columns are not reliably ISO strings. The staging
+      # pre-flight ALTERs them to VARCHAR(32), and data.table::fread has already
+      # auto-typed BIRTHDATE/DEATHDATE as Date, so the loader can write the
+      # underlying epoch-day integer instead: '1935-07-12' arrives as '-12592'
+      # and '2001-11-28' as '11654' (verified against the source CSV).
+      # encounters.start is unaffected and stays ISO, which is why only the
+      # patients-derived branch needs this.
+      #
+      # Discriminated explicitly rather than COALESCE-ing two TRY_CASTs. Tested
+      # both: on the real values they agree ('11654' -> 2001-11-28 either way,
+      # matching the source CSV), because SQL Server rejects a bare '11654' as a
+      # date rather than reading it as a year. They diverge only on an empty
+      # string, which the WHERE clause already excludes. The explicit form is
+      # kept anyway because it states the intent -- two dashes means ISO,
+      # digits-and-minus only means epoch days -- instead of relying on the
+      # order of two silent coercions.
+      dd_expr <- paste0(
+        "case when pat.deathdate like '%-%-%' then try_cast(pat.deathdate as date)",
+        " when ltrim(rtrim(pat.deathdate)) = '' then null",
+        " when pat.deathdate not like '%[^0-9-]%'",
+        " then dateadd(day, try_cast(pat.deathdate as int), '1970-01-01')",
+        " else null end"
+      )
+      recovery_sql <- paste0(
+        "\n-- DEATH_RECOVERY_PATCH (workspace): module-driven deaths, which have\n",
+        "-- no '308646001' certification encounter and are therefore invisible to\n",
+        "-- the upstream insert above.\n",
+        "union all\n",
+        "select p.person_id                     person_id,\n",
+        "       ", dd_expr, "  death_date,\n",
+        "       ", dd_expr, "  death_datetime,\n",
+        "       32817                           death_type_concept_id,\n",
+        "       0                               cause_concept_id,\n",
+        "       cast(null as varchar(50))       cause_source_value,\n",
+        "       0                               cause_source_concept_id\n",
+        "  from ", synthea_schema, ".patients pat\n",
+        "  join ", cdm, ".person p\n",
+        "    on pat.id = p.person_source_value\n",
+        " where pat.deathdate is not null\n",
+        "   and ltrim(rtrim(pat.deathdate)) <> ''\n",
+        "   and ", dd_expr, " is not null\n",
+        "   and not exists (select 1 from ", synthea_schema, ".encounters e2\n",
+        "                    where e2.patient = pat.id\n",
+        "                      and e2.code    = '308646001')\n"
+      )
+      pat_end <- "(?s)^(.*);\\s*$"
+      if (grepl(pat_end, sql, perl = TRUE)) {
+        sql <- sub(pat_end, paste0("\\1", recovery_sql, ";"), sql, perl = TRUE)
+        message("[ETL patch] insert_death.sql extended to recover module-driven deaths.")
+      } else {
+        warning("[ETL patch] insert_death.sql did not match the expected ",
+                "single-statement shape; module-driven deaths will be LOST.")
+      }
+    }
+
     if (tolower(basename(file_path)) == "insert_drug_era.sql") {
       s <- config$cdm_schema
       sql <- paste0(

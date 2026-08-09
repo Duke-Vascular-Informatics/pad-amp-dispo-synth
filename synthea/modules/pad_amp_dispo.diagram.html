@@ -129,32 +129,112 @@ flowchart TD
   n108["&lt;b&gt;Preop Clearance Encounter End&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
   n109["&lt;b&gt;Preop To Index Delay&lt;/b&gt;&lt;br/&gt;[Delay]"]
   n110["&lt;b&gt;Index Admission Encounter&lt;/b&gt;&lt;br/&gt;[Encounter]&lt;br/&gt;SNOMED-CT 32485007: Hospital admission (vocab query — OMOP 9201)"]
-  n111["&lt;b&gt;Index Procedure Branch&lt;/b&gt;&lt;br/&gt;[Simple]"]
-  n112["&lt;b&gt;Index Procedure AKA&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 79733001: Amputation above-knee (vocab query — OMOP 4195136)"]
-  n113["&lt;b&gt;Index Procedure&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 88312006: Amputation of leg through tibia and fibula (vocab query — OMOP 4338257)"]
-  n114["&lt;b&gt;Post Index Inpatient Delay&lt;/b&gt;&lt;br/&gt;[Delay]"]
-  n115["&lt;b&gt;Discharge Disposition Branch&lt;/b&gt;&lt;br/&gt;[Simple]"]
-  n116["&lt;b&gt;Index Discharge Home&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
-  n117["&lt;b&gt;Index Discharge SNF&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
-  n118["&lt;b&gt;Index Discharge IRF&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
-  n119["&lt;b&gt;Post Discharge Observation Delay&lt;/b&gt;&lt;br/&gt;[Delay]"]
-  n120["&lt;b&gt;Outcome Assessment&lt;/b&gt;&lt;br/&gt;[Simple]"]
-  n121["&lt;b&gt;Outcome Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 50849002: Emergency room admission (vocab query — OMOP 9203)"]
-  n122["&lt;b&gt;Outcome Encounter&lt;/b&gt;&lt;br/&gt;[Encounter]&lt;br/&gt;SNOMED-CT 50849002: Emergency room admission (vocab query — OMOP 9203)"]
-  n123["&lt;b&gt;Outcome Management Duration&lt;/b&gt;&lt;br/&gt;[Delay]"]
-  n124["&lt;b&gt;Outcome Encounter End&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
-  n125["&lt;b&gt;Post ED Readmission Assessment&lt;/b&gt;&lt;br/&gt;[Simple]"]
-  n126["&lt;b&gt;ED To Readmission Delay&lt;/b&gt;&lt;br/&gt;[Delay]"]
-  n127["&lt;b&gt;Readmission Encounter&lt;/b&gt;&lt;br/&gt;[Encounter]&lt;br/&gt;SNOMED-CT 32485007: Hospital admission (vocab query — OMOP 9201)"]
-  n128["&lt;b&gt;Readmission Duration&lt;/b&gt;&lt;br/&gt;[Delay]"]
-  n129["&lt;b&gt;Readmission Encounter End&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
-  n130["&lt;b&gt;Terminal&lt;/b&gt;&lt;br/&gt;[Terminal]"]
-  n131["&lt;b&gt;Cov DM PVD Only Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n111["&lt;b&gt;Post Index Inpatient Delay&lt;/b&gt;&lt;br/&gt;[Delay]"]
+  n112["&lt;b&gt;Discharge Disposition Branch&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n113["&lt;b&gt;Index Discharge Home&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
+  n114["&lt;b&gt;Index Discharge SNF&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
+  n115["&lt;b&gt;Index Discharge IRF&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
+  n116["&lt;b&gt;Post Discharge Observation Delay&lt;/b&gt;&lt;br/&gt;[Delay]"]
+  n117["&lt;b&gt;Outcome Assessment&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n118["&lt;b&gt;Outcome Onset&lt;/b&gt;&lt;br/&gt;[ConditionOnset]&lt;br/&gt;SNOMED-CT 50849002: Emergency room admission (vocab query — OMOP 9203)"]
+  n119["&lt;b&gt;Outcome Encounter&lt;/b&gt;&lt;br/&gt;[Encounter]&lt;br/&gt;SNOMED-CT 50849002: Emergency room admission (vocab query — OMOP 9203)"]
+  n120["&lt;b&gt;Outcome Management Duration&lt;/b&gt;&lt;br/&gt;[Delay]"]
+  n121["&lt;b&gt;Outcome Encounter End&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
+  n122["&lt;b&gt;Post ED Readmission Assessment&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n123["&lt;b&gt;ED To Readmission Delay&lt;/b&gt;&lt;br/&gt;[Delay]"]
+  n124["&lt;b&gt;Readmission Encounter&lt;/b&gt;&lt;br/&gt;[Encounter]&lt;br/&gt;SNOMED-CT 32485007: Hospital admission (vocab query — OMOP 9201)"]
+  n125["&lt;b&gt;Readmission Duration&lt;/b&gt;&lt;br/&gt;[Delay]"]
+  n126["&lt;b&gt;Readmission Encounter End&lt;/b&gt;&lt;br/&gt;[EncounterEnd]"]
+  n127["&lt;b&gt;Terminal&lt;/b&gt;&lt;br/&gt;[Terminal]"]
+  n128["&lt;b&gt;Cov DM PVD Only Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n129["&lt;b&gt;Index Level Draw&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n130["&lt;b&gt;Set Level TM&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n131["&lt;b&gt;Index Procedure TM&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 265739006: Amputation through metatarsal bones (vocab query — OMOP 4143797)"]
+  n132["&lt;b&gt;Set Definitive True TM&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n133["&lt;b&gt;Set Level TT Initial&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n134["&lt;b&gt;Index Procedure TT Definitive&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 88312006: Amputation of leg through tibia and fibula (vocab query — OMOP 4338257)"]
+  n135["&lt;b&gt;Set Definitive True TT&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n136["&lt;b&gt;Set Level TF Initial&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n137["&lt;b&gt;Index Procedure TF Definitive&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 79733001: Amputation above-knee (vocab query — OMOP 4195136)"]
+  n138["&lt;b&gt;Set Definitive True TF&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n139["&lt;b&gt;Set Level TT Confirmed&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n140["&lt;b&gt;Set Level TF Escalated&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n141["&lt;b&gt;Set Level TF Confirmed&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n142["&lt;b&gt;Set Level From First Code TT&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n143["&lt;b&gt;Set Level From First Code TF&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n144["&lt;b&gt;Set Definitive True Recoded&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n145["&lt;b&gt;Set Late Closure Is Reamp&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n146["&lt;b&gt;Set Late Closure Subtype&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n147["&lt;b&gt;Index Sequence Complete&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n148["&lt;b&gt;Index Procedure TT Staged Within 3wk&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 88312006: Amputation of leg through tibia and fibula (vocab query — OMOP 4338257)"]
+  n149["&lt;b&gt;Index Procedure TT Staged Late&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 88312006: Amputation of leg through tibia and fibula (vocab query — OMOP 4338257)"]
+  n150["&lt;b&gt;Index Procedure TF Staged Within 3wk&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 79733001: Amputation above-knee (vocab query — OMOP 4195136)"]
+  n151["&lt;b&gt;Index Procedure TF Staged Late&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 79733001: Amputation above-knee (vocab query — OMOP 4195136)"]
+  n152["&lt;b&gt;Set Second Code Early&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n153["&lt;b&gt;TT Second Code Branch&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n154["&lt;b&gt;TF Second Code Branch&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n155["&lt;b&gt;TT Second Code Early Delay&lt;/b&gt;&lt;br/&gt;[Delay]"]
+  n156["&lt;b&gt;TF Second Code Early Delay&lt;/b&gt;&lt;br/&gt;[Delay]"]
+  n157["&lt;b&gt;TT Second Code Late Delay&lt;/b&gt;&lt;br/&gt;[Delay]"]
+  n158["&lt;b&gt;TF Second Code Late Delay&lt;/b&gt;&lt;br/&gt;[Delay]"]
+  n159["&lt;b&gt;TT Second Code Escalation Split&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n160["&lt;b&gt;Second Code TT&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 88312006: Amputation of leg through tibia and fibula (vocab query — OMOP 4338257)"]
+  n161["&lt;b&gt;Second Code TF&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 79733001: Amputation above-knee (vocab query — OMOP 4195136)"]
+  n162["&lt;b&gt;Second Code TF Escalated&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 79733001: Amputation above-knee (vocab query — OMOP 4195136)"]
+  n163["&lt;b&gt;Second Code TT Late&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 88312006: Amputation of leg through tibia and fibula (vocab query — OMOP 4338257)"]
+  n164["&lt;b&gt;Second Code TF Late&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 79733001: Amputation above-knee (vocab query — OMOP 4195136)"]
+  n165["&lt;b&gt;Set Definitive True Staged&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n166["&lt;b&gt;Set Second Code Branch Early&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n167["&lt;b&gt;Set Second Code Branch Late&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n168["&lt;b&gt;Set Second Code Branch None&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n169["&lt;b&gt;Index Attributes Guard&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n170["&lt;b&gt;Init Month Counter&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n171["&lt;b&gt;Init Reamp Flag&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n172["&lt;b&gt;Month Tick&lt;/b&gt;&lt;br/&gt;[Counter]"]
+  n173["&lt;b&gt;Month Delay&lt;/b&gt;&lt;br/&gt;[Delay]"]
+  n174["&lt;b&gt;Reamp Already Occurred Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n175["&lt;b&gt;Reamp Level Router&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n176["&lt;b&gt;TM Monthly Reamp Hazard&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n177["&lt;b&gt;TT Monthly Reamp Hazard&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n178["&lt;b&gt;TF Monthly Reamp Hazard&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n179["&lt;b&gt;Reamp Window Eligibility&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n180["&lt;b&gt;Reamp Subtype Router&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n181["&lt;b&gt;TM Reamp Subtype&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n182["&lt;b&gt;TT Reamp Subtype&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n183["&lt;b&gt;TF Reamp Subtype&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n184["&lt;b&gt;Reamp Soft Tissue Revision&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 180048002: Revision coverage of amputation stump (vocab query — OMOP 4078404)"]
+  n185["&lt;b&gt;Reamp TM Same Level&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 265739006: Amputation through metatarsal bones (vocab query — OMOP 4143797)"]
+  n186["&lt;b&gt;Reamp TT Same Level&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 88312006: Amputation of leg through tibia and fibula (vocab query — OMOP 4338257)"]
+  n187["&lt;b&gt;Reamp TF Same Level&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 79733001: Amputation above-knee (vocab query — OMOP 4195136)"]
+  n188["&lt;b&gt;Reamp TM To Higher&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n189["&lt;b&gt;Reamp Higher TT&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 88312006: Amputation of leg through tibia and fibula (vocab query — OMOP 4338257)"]
+  n190["&lt;b&gt;Reamp TT To TF&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 79733001: Amputation above-knee (vocab query — OMOP 4195136)"]
+  n191["&lt;b&gt;Reamp Higher TF&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 79733001: Amputation above-knee (vocab query — OMOP 4195136)"]
+  n192["&lt;b&gt;Set Reamp Subtype SoftTissue&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n193["&lt;b&gt;Set Reamp Subtype SameLevel&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n194["&lt;b&gt;Set Reamp Subtype Higher&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n195["&lt;b&gt;Set Reamp Occurred&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n196["&lt;b&gt;Reamp Laterality Mix&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n197["&lt;b&gt;Set Reamp Lat Ipsilateral&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n198["&lt;b&gt;Set Reamp Lat Unknown&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n199["&lt;b&gt;Set Reamp Lat Bilateral&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n200["&lt;b&gt;Death Hazard Baseline&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n201["&lt;b&gt;Death Hazard After Reamp&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n202["&lt;b&gt;Death State&lt;/b&gt;&lt;br/&gt;[Death]"]
+  n203["&lt;b&gt;Set Death 1y&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n204["&lt;b&gt;Decoy Hazard Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n205["&lt;b&gt;Decoy Contralateral Procedure&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 88312006: Amputation of leg through tibia and fibula (vocab query — OMOP 4338257)"]
+  n206["&lt;b&gt;Set Decoy Contralateral&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n207["&lt;b&gt;Decoy Toe Or Ray Subtype&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n208["&lt;b&gt;Decoy Toe Procedure&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 371186005: Amputation of toe (vocab query — OMOP 4159766)"]
+  n209["&lt;b&gt;Decoy Ray Procedure&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 405443002: Ray amputation of foot (vocab query — OMOP 4226945)"]
+  n210["&lt;b&gt;Set Decoy Toe Ray&lt;/b&gt;&lt;br/&gt;[SetAttribute]"]
+  n211["&lt;b&gt;Month Loop Check&lt;/b&gt;&lt;br/&gt;[Simple]"]
 
   n001 --&gt; n002
   n002 --&gt; n003
   n003 --&gt; n004
-  n004 -- Age --&gt; n130
+  n004 -- Age --&gt; n169
   n004 -- else --&gt; n005
   n005 -- 30% --&gt; n006
   n005 -- 30% --&gt; n007
@@ -177,7 +257,7 @@ flowchart TD
   n017 -- 20% --&gt; n019
   n018 --&gt; n019
   n019 -- Active Condition: Type 2 diabetes mellitus --&gt; n021
-  n019 -- else --&gt; n131
+  n019 -- else --&gt; n128
   n020 --&gt; n021
   n021 -- 40% --&gt; n022
   n021 -- 60% --&gt; n025
@@ -284,7 +364,7 @@ flowchart TD
   n089 --&gt; n090
   n090 -- 5% --&gt; n091
   n090 -- 95% --&gt; n092
-  n091 --&gt; n130
+  n091 --&gt; n169
   n092 --&gt; n093
   n093 --&gt; n094
   n094 --&gt; n095
@@ -307,34 +387,143 @@ flowchart TD
   n107 --&gt; n108
   n108 --&gt; n109
   n109 --&gt; n110
-  n110 --&gt; n111
-  n111 -- 40% --&gt; n112
-  n111 -- 60% --&gt; n113
-  n112 --&gt; n114
-  n113 --&gt; n114
-  n114 --&gt; n115
-  n115 -- 65% --&gt; n116
-  n115 -- 22% --&gt; n117
-  n115 -- 13% --&gt; n118
-  n116 --&gt; n119
-  n117 --&gt; n119
+  n110 --&gt; n129
+  n111 --&gt; n112
+  n112 -- 65% --&gt; n113
+  n112 -- 22% --&gt; n114
+  n112 -- 13% --&gt; n115
+  n113 --&gt; n116
+  n114 --&gt; n116
+  n115 --&gt; n116
+  n116 --&gt; n117
+  n117 -- 62% --&gt; n169
+  n117 -- 35% --&gt; n118
+  n117 -- 3% --&gt; n124
   n118 --&gt; n119
   n119 --&gt; n120
-  n120 -- 62% --&gt; n130
-  n120 -- 35% --&gt; n121
-  n120 -- 3% --&gt; n127
+  n120 --&gt; n121
   n121 --&gt; n122
-  n122 --&gt; n123
+  n122 -- 70% --&gt; n123
+  n122 -- 30% --&gt; n169
   n123 --&gt; n124
   n124 --&gt; n125
-  n125 -- 70% --&gt; n126
-  n125 -- 30% --&gt; n130
-  n126 --&gt; n127
-  n127 --&gt; n128
-  n128 --&gt; n129
-  n129 --&gt; n130
-  n131 -- 60% --&gt; n020
-  n131 -- 40% --&gt; n021
+  n125 --&gt; n126
+  n126 --&gt; n169
+  n128 -- 60% --&gt; n020
+  n128 -- 40% --&gt; n021
+  n129 -- 33.8% --&gt; n130
+  n129 -- 44.6% --&gt; n133
+  n129 -- 21.6% --&gt; n136
+  n130 --&gt; n131
+  n131 --&gt; n132
+  n132 --&gt; n168
+  n133 --&gt; n153
+  n134 --&gt; n135
+  n135 --&gt; n168
+  n136 --&gt; n154
+  n137 --&gt; n138
+  n138 --&gt; n168
+  n139 --&gt; n165
+  n140 --&gt; n165
+  n141 --&gt; n165
+  n142 --&gt; n144
+  n143 --&gt; n144
+  n144 --&gt; n145
+  n145 --&gt; n146
+  n146 --&gt; n167
+  n147 --&gt; n111
+  n148 --&gt; n155
+  n149 --&gt; n157
+  n150 --&gt; n156
+  n151 --&gt; n158
+  n152 --&gt; n166
+  n153 -- 17% --&gt; n148
+  n153 -- 2% --&gt; n149
+  n153 -- 81% --&gt; n134
+  n154 -- 17% --&gt; n150
+  n154 -- 2% --&gt; n151
+  n154 -- 81% --&gt; n137
+  n155 --&gt; n159
+  n156 --&gt; n161
+  n157 --&gt; n163
+  n158 --&gt; n164
+  n159 -- 87.5% --&gt; n160
+  n159 -- 12.5% --&gt; n162
+  n160 --&gt; n139
+  n161 --&gt; n141
+  n162 --&gt; n140
+  n163 --&gt; n142
+  n164 --&gt; n143
+  n165 --&gt; n152
+  n166 --&gt; n147
+  n167 --&gt; n147
+  n168 --&gt; n147
+  n169 -- Attribute --&gt; n170
+  n169 -- else --&gt; n127
+  n170 --&gt; n171
+  n171 --&gt; n172
+  n172 --&gt; n173
+  n173 --&gt; n174
+  n174 -- Attribute: == TRUE --&gt; n201
+  n174 -- else --&gt; n175
+  n175 -- Attribute: == TM --&gt; n176
+  n175 -- Attribute: == TT --&gt; n177
+  n175 -- else --&gt; n178
+  n176 -- 4% --&gt; n179
+  n176 -- 96% --&gt; n200
+  n177 -- 2.9% --&gt; n179
+  n177 -- 97.1% --&gt; n200
+  n178 -- 1.7% --&gt; n179
+  n178 -- 98.3% --&gt; n200
+  n179 -- And --&gt; n200
+  n179 -- else --&gt; n180
+  n180 -- Attribute: == TM --&gt; n181
+  n180 -- Attribute: == TT --&gt; n182
+  n180 -- else --&gt; n183
+  n181 -- 55% --&gt; n185
+  n181 -- 45% --&gt; n188
+  n182 -- 30% --&gt; n184
+  n182 -- 35% --&gt; n186
+  n182 -- 35% --&gt; n190
+  n183 -- 45% --&gt; n184
+  n183 -- 55% --&gt; n187
+  n184 --&gt; n192
+  n185 --&gt; n193
+  n186 --&gt; n193
+  n187 --&gt; n193
+  n188 -- 75% --&gt; n189
+  n188 -- 25% --&gt; n191
+  n189 --&gt; n194
+  n190 --&gt; n194
+  n191 --&gt; n194
+  n192 --&gt; n195
+  n193 --&gt; n195
+  n194 --&gt; n195
+  n195 --&gt; n196
+  n196 -- 80% --&gt; n197
+  n196 -- 15% --&gt; n198
+  n196 -- 5% --&gt; n199
+  n197 --&gt; n201
+  n198 --&gt; n201
+  n199 --&gt; n201
+  n200 -- 0.5% --&gt; n203
+  n200 -- 99.5% --&gt; n204
+  n201 -- 1% --&gt; n203
+  n201 -- 99% --&gt; n204
+  n202 --&gt; n127
+  n203 --&gt; n202
+  n204 -- 0.9% --&gt; n205
+  n204 -- 0.6% --&gt; n207
+  n204 -- 98.5% --&gt; n211
+  n205 --&gt; n206
+  n206 --&gt; n211
+  n207 -- 60% --&gt; n208
+  n207 -- 40% --&gt; n209
+  n208 --&gt; n210
+  n209 --&gt; n210
+  n210 --&gt; n211
+  n211 -- Attribute: &lt; 12 --&gt; n172
+  n211 -- else --&gt; n127
     </div>
   </div>
 

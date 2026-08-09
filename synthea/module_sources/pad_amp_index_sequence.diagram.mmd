@@ -1,0 +1,105 @@
+%%{init: {'theme':'base','themeVariables':{'fontSize':'13px'},'flowchart':{'useMaxWidth':false,'htmlLabels':true,'nodeSpacing':45,'rankSpacing':55}} }%%
+flowchart TD
+  n001["<b>Initial</b><br/>[Initial]"]
+  n002["<b>Index Level Draw</b><br/>[Simple]"]
+  n003["<b>Set Level TM</b><br/>[SetAttribute]<br/>amp_index_level = TM"]
+  n004["<b>Index Procedure TM</b><br/>[Procedure]<br/>SNOMED-CT 265739006: Amputation through metatarsal bones"]
+  n005["<b>Set Definitive True TM</b><br/>[SetAttribute]<br/>amp_index_definitive = True"]
+  n006["<b>Set Level TT Initial</b><br/>[SetAttribute]<br/>amp_index_level = TT"]
+  n007["<b>Index Procedure TT Definitive</b><br/>[Procedure]<br/>SNOMED-CT 88312006: Amputation of leg through tibia and fibula"]
+  n008["<b>Set Definitive True TT</b><br/>[SetAttribute]<br/>amp_index_definitive = True"]
+  n009["<b>Set Level TF Initial</b><br/>[SetAttribute]<br/>amp_index_level = TF"]
+  n010["<b>Index Procedure TF Definitive</b><br/>[Procedure]<br/>SNOMED-CT 79733001: Amputation above-knee"]
+  n011["<b>Set Definitive True TF</b><br/>[SetAttribute]<br/>amp_index_definitive = True"]
+  n012["<b>Set Level TT Confirmed</b><br/>[SetAttribute]<br/>amp_index_level = TT"]
+  n013["<b>Set Level TF Escalated</b><br/>[SetAttribute]<br/>amp_index_level = TF"]
+  n014["<b>Set Level TF Confirmed</b><br/>[SetAttribute]<br/>amp_index_level = TF"]
+  n015["<b>Set Level From First Code TT</b><br/>[SetAttribute]<br/>amp_index_level = TT"]
+  n016["<b>Set Level From First Code TF</b><br/>[SetAttribute]<br/>amp_index_level = TF"]
+  n017["<b>Set Definitive True Recoded</b><br/>[SetAttribute]<br/>amp_index_definitive = True"]
+  n018["<b>Set Late Closure Is Reamp</b><br/>[SetAttribute]<br/>amp_reamp_occurred = True"]
+  n019["<b>Set Late Closure Subtype</b><br/>[SetAttribute]<br/>amp_reamp_subtype = same_level"]
+  n020["<b>Index Sequence Complete</b><br/>[Simple]"]
+  n021["<b>Terminal</b><br/>[Terminal]"]
+  n022["<b>Index Procedure TT Staged Within 3wk</b><br/>[Procedure]<br/>SNOMED-CT 88312006: Amputation of leg through tibia and fibula"]
+  n023["<b>Index Procedure TT Staged Late</b><br/>[Procedure]<br/>SNOMED-CT 88312006: Amputation of leg through tibia and fibula"]
+  n024["<b>Index Procedure TF Staged Within 3wk</b><br/>[Procedure]<br/>SNOMED-CT 79733001: Amputation above-knee"]
+  n025["<b>Index Procedure TF Staged Late</b><br/>[Procedure]<br/>SNOMED-CT 79733001: Amputation above-knee"]
+  n026["<b>Set Second Code Early</b><br/>[SetAttribute]<br/>amp_second_code_early = True"]
+  n027["<b>TT Second Code Branch</b><br/>[Simple]"]
+  n028["<b>TF Second Code Branch</b><br/>[Simple]"]
+  n029["<b>TT Second Code Early Delay</b><br/>[Delay]<br/>delay 1–21 days"]
+  n030["<b>TF Second Code Early Delay</b><br/>[Delay]<br/>delay 1–21 days"]
+  n031["<b>TT Second Code Late Delay</b><br/>[Delay]<br/>delay 22–42 days"]
+  n032["<b>TF Second Code Late Delay</b><br/>[Delay]<br/>delay 22–42 days"]
+  n033["<b>TT Second Code Escalation Split</b><br/>[Simple]"]
+  n034["<b>Second Code TT</b><br/>[Procedure]<br/>SNOMED-CT 88312006: Amputation of leg through tibia and fibula"]
+  n035["<b>Second Code TF</b><br/>[Procedure]<br/>SNOMED-CT 79733001: Amputation above-knee"]
+  n036["<b>Second Code TF Escalated</b><br/>[Procedure]<br/>SNOMED-CT 79733001: Amputation above-knee"]
+  n037["<b>Second Code TT Late</b><br/>[Procedure]<br/>SNOMED-CT 88312006: Amputation of leg through tibia and fibula"]
+  n038["<b>Second Code TF Late</b><br/>[Procedure]<br/>SNOMED-CT 79733001: Amputation above-knee"]
+  n039["<b>Set Definitive True Staged</b><br/>[SetAttribute]<br/>amp_index_definitive = True"]
+  n040["<b>Set Second Code Branch Early</b><br/>[SetAttribute]<br/>amp_index_closure_branch = within_3wk"]
+  n041["<b>Set Second Code Branch Late</b><br/>[SetAttribute]<br/>amp_index_closure_branch = late"]
+  n042["<b>Set Second Code Branch None</b><br/>[SetAttribute]<br/>amp_index_closure_branch = none"]
+  n001 --> n002
+  n002 -- 33.8% --> n003
+  n002 -- 44.6% --> n006
+  n002 -- 21.6% --> n009
+  n003 --> n004
+  n004 --> n005
+  n005 --> n042
+  n006 --> n027
+  n007 --> n008
+  n008 --> n042
+  n009 --> n028
+  n010 --> n011
+  n011 --> n042
+  n012 --> n039
+  n013 --> n039
+  n014 --> n039
+  n015 --> n017
+  n016 --> n017
+  n017 --> n018
+  n018 --> n019
+  n019 --> n041
+  n020 --> n021
+  n022 --> n029
+  n023 --> n031
+  n024 --> n030
+  n025 --> n032
+  n026 --> n040
+  n027 -- 17% --> n022
+  n027 -- 2% --> n023
+  n027 -- 81% --> n007
+  n028 -- 17% --> n024
+  n028 -- 2% --> n025
+  n028 -- 81% --> n010
+  n029 --> n033
+  n030 --> n035
+  n031 --> n037
+  n032 --> n038
+  n033 -- 87.5% --> n034
+  n033 -- 12.5% --> n036
+  n034 --> n012
+  n035 --> n014
+  n036 --> n013
+  n037 --> n015
+  n038 --> n016
+  n039 --> n026
+  n040 --> n020
+  n041 --> n020
+  n042 --> n020
+  classDef published fill:#1d4ed8,stroke:#1e3a8a,color:#fff,stroke-width:2px
+  classDef signal fill:#047857,stroke:#065f46,color:#fff
+  classDef decoy fill:#b91c1c,stroke:#7f1d1d,color:#fff
+  classDef death fill:#3f3f46,stroke:#18181b,color:#fff
+  classDef attr fill:#f5f5f4,stroke:#a8a29e,color:#3f3f46
+  classDef delay fill:#fef3c7,stroke:#d97706,color:#78350f
+  classDef guard fill:#7c3aed,stroke:#5b21b6,color:#fff
+  classDef logic fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+  classDef terminalish fill:#fff,stroke:#71717a,color:#3f3f46,stroke-dasharray:3 3
+  class n001,n021 terminalish
+  class n002,n004,n007,n010,n020,n022,n023,n024,n025,n027,n028,n033,n034,n035,n036,n037,n038 logic
+  class n003,n005,n006,n008,n009,n011,n012,n013,n014,n015,n016,n017,n018,n019,n026,n039,n040,n041,n042 attr
+  class n029,n030,n031,n032 delay

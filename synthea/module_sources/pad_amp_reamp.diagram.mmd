@@ -1,0 +1,130 @@
+%%{init: {'theme':'base','themeVariables':{'fontSize':'13px'},'flowchart':{'useMaxWidth':false,'htmlLabels':true,'nodeSpacing':45,'rankSpacing':55}} }%%
+flowchart TD
+  n001["<b>Initial</b><br/>[Initial]"]
+  n002["<b>Index Attributes Guard</b><br/>[Guard]"]
+  n003["<b>Init Month Counter</b><br/>[SetAttribute]<br/>amp_month = 0"]
+  n004["<b>Init Reamp Flag</b><br/>[SetAttribute]<br/>amp_reamp_occurred = False"]
+  n005["<b>Month Tick</b><br/>[Counter]"]
+  n006["<b>Month Delay</b><br/>[Delay]<br/>delay 30–31 days"]
+  n007["<b>Reamp Already Occurred Check</b><br/>[Simple]"]
+  n008["<b>Reamp Level Router</b><br/>[Simple]"]
+  n009["<b>TM Monthly Reamp Hazard</b><br/>[Simple]"]
+  n010["<b>TT Monthly Reamp Hazard</b><br/>[Simple]"]
+  n011["<b>TF Monthly Reamp Hazard</b><br/>[Simple]"]
+  n012["<b>Reamp Window Eligibility</b><br/>[Simple]"]
+  n013["<b>Reamp Subtype Router</b><br/>[Simple]"]
+  n014["<b>TM Reamp Subtype</b><br/>[Simple]"]
+  n015["<b>TT Reamp Subtype</b><br/>[Simple]"]
+  n016["<b>TF Reamp Subtype</b><br/>[Simple]"]
+  n017["<b>Reamp Soft Tissue Revision</b><br/>[Procedure]<br/>SNOMED-CT 180048002: Revision coverage of amputation stump"]
+  n018["<b>Reamp TM Same Level</b><br/>[Procedure]<br/>SNOMED-CT 265739006: Amputation through metatarsal bones"]
+  n019["<b>Reamp TT Same Level</b><br/>[Procedure]<br/>SNOMED-CT 88312006: Amputation of leg through tibia and fibula"]
+  n020["<b>Reamp TF Same Level</b><br/>[Procedure]<br/>SNOMED-CT 79733001: Amputation above-knee"]
+  n021["<b>Reamp TM To Higher</b><br/>[Simple]"]
+  n022["<b>Reamp Higher TT</b><br/>[Procedure]<br/>SNOMED-CT 88312006: Amputation of leg through tibia and fibula"]
+  n023["<b>Reamp TT To TF</b><br/>[Procedure]<br/>SNOMED-CT 79733001: Amputation above-knee"]
+  n024["<b>Reamp Higher TF</b><br/>[Procedure]<br/>SNOMED-CT 79733001: Amputation above-knee"]
+  n025["<b>Set Reamp Subtype SoftTissue</b><br/>[SetAttribute]<br/>amp_reamp_subtype = soft_tissue_revision"]
+  n026["<b>Set Reamp Subtype SameLevel</b><br/>[SetAttribute]<br/>amp_reamp_subtype = same_level"]
+  n027["<b>Set Reamp Subtype Higher</b><br/>[SetAttribute]<br/>amp_reamp_subtype = higher_level"]
+  n028["<b>Set Reamp Occurred</b><br/>[SetAttribute]<br/>amp_reamp_occurred = True"]
+  n029["<b>Reamp Laterality Mix</b><br/>[Simple]"]
+  n030["<b>Set Reamp Lat Ipsilateral</b><br/>[SetAttribute]<br/>amp_reamp_laterality = ipsilateral"]
+  n031["<b>Set Reamp Lat Unknown</b><br/>[SetAttribute]<br/>amp_reamp_laterality = unknown"]
+  n032["<b>Set Reamp Lat Bilateral</b><br/>[SetAttribute]<br/>amp_reamp_laterality = bilateral"]
+  n033["<b>Death Hazard Baseline</b><br/>[Simple]"]
+  n034["<b>Death Hazard After Reamp</b><br/>[Simple]"]
+  n035["<b>Death State</b><br/>[Death]"]
+  n036["<b>Set Death 1y</b><br/>[SetAttribute]<br/>amp_death_1y = True"]
+  n037["<b>Decoy Hazard Check</b><br/>[Simple]"]
+  n038["<b>Decoy Contralateral Procedure</b><br/>[Procedure]<br/>SNOMED-CT 88312006: Amputation of leg through tibia and fibula"]
+  n039["<b>Set Decoy Contralateral</b><br/>[SetAttribute]<br/>amp_decoy_contralateral = True"]
+  n040["<b>Decoy Toe Or Ray Subtype</b><br/>[Simple]"]
+  n041["<b>Decoy Toe Procedure</b><br/>[Procedure]<br/>SNOMED-CT 371186005: Amputation of toe"]
+  n042["<b>Decoy Ray Procedure</b><br/>[Procedure]<br/>SNOMED-CT 405443002: Ray amputation of foot"]
+  n043["<b>Set Decoy Toe Ray</b><br/>[SetAttribute]<br/>amp_decoy_toe_or_ray = True"]
+  n044["<b>Month Loop Check</b><br/>[Simple]"]
+  n045["<b>Terminal</b><br/>[Terminal]"]
+  n001 --> n002
+  n002 --> n003
+  n003 --> n004
+  n004 --> n005
+  n005 --> n006
+  n006 --> n007
+  n007 -- "amp_reamp_occurred == true" --> n034
+  n007 -- "else" --> n008
+  n008 -- "amp_index_level == TM" --> n009
+  n008 -- "amp_index_level == TT" --> n010
+  n008 -- "else" --> n011
+  n009 -- 4% --> n012
+  n009 -- 96% --> n033
+  n010 -- 2.9% --> n012
+  n010 -- 97.1% --> n033
+  n011 -- 1.7% --> n012
+  n011 -- 98.3% --> n033
+  n012 -- "amp_index_definitive == false AND amp_month <= 1" --> n033
+  n012 -- "else" --> n013
+  n013 -- "amp_index_level == TM" --> n014
+  n013 -- "amp_index_level == TT" --> n015
+  n013 -- "else" --> n016
+  n014 -- 55% --> n018
+  n014 -- 45% --> n021
+  n015 -- 30% --> n017
+  n015 -- 35% --> n019
+  n015 -- 35% --> n023
+  n016 -- 45% --> n017
+  n016 -- 55% --> n020
+  n017 --> n025
+  n018 --> n026
+  n019 --> n026
+  n020 --> n026
+  n021 -- 75% --> n022
+  n021 -- 25% --> n024
+  n022 --> n027
+  n023 --> n027
+  n024 --> n027
+  n025 --> n028
+  n026 --> n028
+  n027 --> n028
+  n028 --> n029
+  n029 -- 80% --> n030
+  n029 -- 15% --> n031
+  n029 -- 5% --> n032
+  n030 --> n034
+  n031 --> n034
+  n032 --> n034
+  n033 -- 1.6% --> n035
+  n033 -- 98.4% --> n037
+  n034 -- 2.9% --> n035
+  n034 -- 97.1% --> n037
+  n035 --> n036
+  n036 --> n045
+  n037 -- 0.9% --> n038
+  n037 -- 0.6% --> n040
+  n037 -- 98.5% --> n044
+  n038 --> n039
+  n039 --> n044
+  n040 -- 60% --> n041
+  n040 -- 40% --> n042
+  n041 --> n043
+  n042 --> n043
+  n043 --> n044
+  n044 -- "amp_month < 12" --> n005
+  n044 -- "else" --> n045
+  classDef published fill:#1d4ed8,stroke:#1e3a8a,color:#fff,stroke-width:2px
+  classDef signal fill:#047857,stroke:#065f46,color:#fff
+  classDef decoy fill:#b91c1c,stroke:#7f1d1d,color:#fff
+  classDef death fill:#3f3f46,stroke:#18181b,color:#fff
+  classDef attr fill:#f5f5f4,stroke:#a8a29e,color:#3f3f46
+  classDef delay fill:#fef3c7,stroke:#d97706,color:#78350f
+  classDef guard fill:#7c3aed,stroke:#5b21b6,color:#fff
+  classDef logic fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+  classDef terminalish fill:#fff,stroke:#71717a,color:#3f3f46,stroke-dasharray:3 3
+  class n001,n045 terminalish
+  class n002 guard
+  class n003,n004,n025,n026,n027,n028,n030,n031,n032,n036 attr
+  class n005,n007,n008,n009,n010,n011,n012,n013,n014,n015,n016,n021,n029,n044 logic
+  class n006 delay
+  class n017,n018,n019,n020,n022,n023,n024 signal
+  class n033,n034,n035 death
+  class n037,n038,n039,n040,n041,n042,n043 decoy

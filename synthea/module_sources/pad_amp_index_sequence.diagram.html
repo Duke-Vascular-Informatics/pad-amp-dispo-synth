@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pad_amp_index_sequence — state diagram</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 2em auto; max-width: 1500px; padding: 0 1.5em;
+            background: #f5f5f4; color: #27272a; line-height: 1.55; }
+    h1 { color: #18181b; margin-bottom: .2em; }
+    h2 { color: #18181b; margin-top: 1.8em; font-size: 1.15em;
+          border-bottom: 1px solid #d4d4d8; padding-bottom: .3em; }
+    .sub { color: #52525b; margin-top: 0; }
+    .diagram-box { background: #fff; border: 1px solid #d4d4d8; border-radius: 8px;
+                    padding: 1.5em; overflow-x: auto; margin-top: 1em; }
+    ul.legend { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: .4em 1.5em; }
+    ul.legend li { display: flex; align-items: center; font-size: .9em; }
+    .sw { display: inline-block; width: 15px; height: 15px; border-radius: 3px;
+           margin-right: .5em; border: 1px solid rgba(0,0,0,.25); }
+    table { border-collapse: collapse; width: 100%; font-size: .9em; background: #fff; }
+    th, td { border: 1px solid #d4d4d8; padding: .45em .7em; text-align: left; }
+    th { background: #e4e4e7; }
+    code { background: #e4e4e7; padding: .1em .35em; border-radius: 3px; font-size: .9em; }
+    .warn { background: #fef2f2; border-left: 4px solid #b91c1c; padding: .8em 1em;
+             border-radius: 0 4px 4px 0; margin: 1em 0; }
+    footer { margin-top: 3em; font-size: .8em; color: #a1a1aa;
+              border-top: 1px solid #e4e4e7; padding-top: 1em; }
+  </style>
+</head>
+<body>
+  <h1>pad_amp_index_sequence — state diagram</h1>
+  <p class="sub">Incident amputation level and the guillotine closure sequence (index side) for <code>pad_amp</code> v2 &mdash; a drop-in replacement for <code>Index_Procedure_Branch</code> and its two arms in <code>pad_amp_dispo.json</code> &middot; 42 states &middot; generated from
+     <code>pad_amp_index_sequence.json</code>, not hand-drawn.</p>
+
+  <h2>Legend</h2>
+  <ul class="legend">
+      <li><span class="sw" style="background:#fef3c7"></span>Timing window</li>
+      <li><span class="sw" style="background:#e0f2fe"></span>Routing / branch</li>
+      <li><span class="sw" style="background:#f5f5f4"></span>Attribute (QC handle)</li>
+  </ul>
+
+
+  <h2>What this sequence must reproduce</h2>
+  <table>
+    <tr><th>Quantity</th><th>Target</th><th>Composed simulation</th></tr>
+    <tr><td>Final level mix TM / TT / TF</td><td>33.8 / 43.7 / 22.5%</td>
+        <td>33.69 / 43.79 / 22.52%</td></tr>
+    <tr><td>Initial draw (corrected for TT&rarr;TF escalation)</td>
+        <td colspan="2">33.80 / <b>44.65</b> / <b>21.55</b>% &mdash; <i>not</i> the published mix</td></tr>
+    <tr><td>Guillotine share of all index patients</td><td>&mdash;</td><td>13.28%</td></tr>
+    <tr><td>Closure within 3 weeks / late / none</td><td>85 / 10 / 5% of guillotines</td>
+        <td>11.27 / 1.35 / 0.66% of all</td></tr>
+  </table>
+  <p class="sub"><b>Guillotines occur only at TT and TF</b> &mdash; MoRe says so
+     explicitly, so TM is always definitive. That is why the guillotine share is 13.3%
+     of all patients rather than 20%.</p>
+  <div class="warn">
+    <b>The closure defines the index level.</b> MoRe searches forward three weeks
+     <i>&ldquo;to classify the incident level&rdquo;</i> &mdash; a guillotine TT closed at
+     TF is an incident <b>TF</b>. Three branches, and branch (b) is the sharpest test
+     in the dataset: <b>the same amputation code at day 20 is part of the index event,
+     at day 25 it is an outcome.</b> Nothing else tests the two-window rule.
+    <br><br>
+    ⛔ <b>Blocker:</b> the guillotine codes are <b>CPT4-only</b> (27882 &rarr; OMOP
+     2105448, 27592 &rarr; OMOP 2105211). No SNOMED guillotine-amputation concept
+     exists. This pipeline has only ever emitted SNOMED-CT/RxNorm/LOINC, so confirm
+     the ETL carries CPT4 before trusting any guillotine output.
+  </div>
+
+  <h2>Diagram</h2>
+  <div class="diagram-box">
+    <div class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'fontSize':'13px'},'flowchart':{'useMaxWidth':false,'htmlLabels':true,'nodeSpacing':45,'rankSpacing':55}} }%%
+flowchart TD
+  n001["&lt;b&gt;Initial&lt;/b&gt;&lt;br/&gt;[Initial]"]
+  n002["&lt;b&gt;Index Level Draw&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n003["&lt;b&gt;Set Level TM&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_index_level = TM"]
+  n004["&lt;b&gt;Index Procedure TM&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 265739006: Amputation through metatarsal bones"]
+  n005["&lt;b&gt;Set Definitive True TM&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_index_definitive = True"]
+  n006["&lt;b&gt;Set Level TT Initial&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_index_level = TT"]
+  n007["&lt;b&gt;Index Procedure TT Definitive&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 88312006: Amputation of leg through tibia and fibula"]
+  n008["&lt;b&gt;Set Definitive True TT&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_index_definitive = True"]
+  n009["&lt;b&gt;Set Level TF Initial&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_index_level = TF"]
+  n010["&lt;b&gt;Index Procedure TF Definitive&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 79733001: Amputation above-knee"]
+  n011["&lt;b&gt;Set Definitive True TF&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_index_definitive = True"]
+  n012["&lt;b&gt;Set Level TT Confirmed&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_index_level = TT"]
+  n013["&lt;b&gt;Set Level TF Escalated&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_index_level = TF"]
+  n014["&lt;b&gt;Set Level TF Confirmed&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_index_level = TF"]
+  n015["&lt;b&gt;Set Level From First Code TT&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_index_level = TT"]
+  n016["&lt;b&gt;Set Level From First Code TF&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_index_level = TF"]
+  n017["&lt;b&gt;Set Definitive True Recoded&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_index_definitive = True"]
+  n018["&lt;b&gt;Set Late Closure Is Reamp&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_reamp_occurred = True"]
+  n019["&lt;b&gt;Set Late Closure Subtype&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_reamp_subtype = same_level"]
+  n020["&lt;b&gt;Index Sequence Complete&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n021["&lt;b&gt;Terminal&lt;/b&gt;&lt;br/&gt;[Terminal]"]
+  n022["&lt;b&gt;Index Procedure TT Staged Within 3wk&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 88312006: Amputation of leg through tibia and fibula"]
+  n023["&lt;b&gt;Index Procedure TT Staged Late&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 88312006: Amputation of leg through tibia and fibula"]
+  n024["&lt;b&gt;Index Procedure TF Staged Within 3wk&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 79733001: Amputation above-knee"]
+  n025["&lt;b&gt;Index Procedure TF Staged Late&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 79733001: Amputation above-knee"]
+  n026["&lt;b&gt;Set Second Code Early&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_second_code_early = True"]
+  n027["&lt;b&gt;TT Second Code Branch&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n028["&lt;b&gt;TF Second Code Branch&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n029["&lt;b&gt;TT Second Code Early Delay&lt;/b&gt;&lt;br/&gt;[Delay]&lt;br/&gt;delay 1–21 days"]
+  n030["&lt;b&gt;TF Second Code Early Delay&lt;/b&gt;&lt;br/&gt;[Delay]&lt;br/&gt;delay 1–21 days"]
+  n031["&lt;b&gt;TT Second Code Late Delay&lt;/b&gt;&lt;br/&gt;[Delay]&lt;br/&gt;delay 22–42 days"]
+  n032["&lt;b&gt;TF Second Code Late Delay&lt;/b&gt;&lt;br/&gt;[Delay]&lt;br/&gt;delay 22–42 days"]
+  n033["&lt;b&gt;TT Second Code Escalation Split&lt;/b&gt;&lt;br/&gt;[Simple]"]
+  n034["&lt;b&gt;Second Code TT&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 88312006: Amputation of leg through tibia and fibula"]
+  n035["&lt;b&gt;Second Code TF&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 79733001: Amputation above-knee"]
+  n036["&lt;b&gt;Second Code TF Escalated&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 79733001: Amputation above-knee"]
+  n037["&lt;b&gt;Second Code TT Late&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 88312006: Amputation of leg through tibia and fibula"]
+  n038["&lt;b&gt;Second Code TF Late&lt;/b&gt;&lt;br/&gt;[Procedure]&lt;br/&gt;SNOMED-CT 79733001: Amputation above-knee"]
+  n039["&lt;b&gt;Set Definitive True Staged&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_index_definitive = True"]
+  n040["&lt;b&gt;Set Second Code Branch Early&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_index_closure_branch = within_3wk"]
+  n041["&lt;b&gt;Set Second Code Branch Late&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_index_closure_branch = late"]
+  n042["&lt;b&gt;Set Second Code Branch None&lt;/b&gt;&lt;br/&gt;[SetAttribute]&lt;br/&gt;amp_index_closure_branch = none"]
+  n001 --&gt; n002
+  n002 -- 33.8% --&gt; n003
+  n002 -- 44.6% --&gt; n006
+  n002 -- 21.6% --&gt; n009
+  n003 --&gt; n004
+  n004 --&gt; n005
+  n005 --&gt; n042
+  n006 --&gt; n027
+  n007 --&gt; n008
+  n008 --&gt; n042
+  n009 --&gt; n028
+  n010 --&gt; n011
+  n011 --&gt; n042
+  n012 --&gt; n039
+  n013 --&gt; n039
+  n014 --&gt; n039
+  n015 --&gt; n017
+  n016 --&gt; n017
+  n017 --&gt; n018
+  n018 --&gt; n019
+  n019 --&gt; n041
+  n020 --&gt; n021
+  n022 --&gt; n029
+  n023 --&gt; n031
+  n024 --&gt; n030
+  n025 --&gt; n032
+  n026 --&gt; n040
+  n027 -- 17% --&gt; n022
+  n027 -- 2% --&gt; n023
+  n027 -- 81% --&gt; n007
+  n028 -- 17% --&gt; n024
+  n028 -- 2% --&gt; n025
+  n028 -- 81% --&gt; n010
+  n029 --&gt; n033
+  n030 --&gt; n035
+  n031 --&gt; n037
+  n032 --&gt; n038
+  n033 -- 87.5% --&gt; n034
+  n033 -- 12.5% --&gt; n036
+  n034 --&gt; n012
+  n035 --&gt; n014
+  n036 --&gt; n013
+  n037 --&gt; n015
+  n038 --&gt; n016
+  n039 --&gt; n026
+  n040 --&gt; n020
+  n041 --&gt; n020
+  n042 --&gt; n020
+  classDef published fill:#1d4ed8,stroke:#1e3a8a,color:#fff,stroke-width:2px
+  classDef signal fill:#047857,stroke:#065f46,color:#fff
+  classDef decoy fill:#b91c1c,stroke:#7f1d1d,color:#fff
+  classDef death fill:#3f3f46,stroke:#18181b,color:#fff
+  classDef attr fill:#f5f5f4,stroke:#a8a29e,color:#3f3f46
+  classDef delay fill:#fef3c7,stroke:#d97706,color:#78350f
+  classDef guard fill:#7c3aed,stroke:#5b21b6,color:#fff
+  classDef logic fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+  classDef terminalish fill:#fff,stroke:#71717a,color:#3f3f46,stroke-dasharray:3 3
+  class n001,n021 terminalish
+  class n002,n004,n007,n010,n020,n022,n023,n024,n025,n027,n028,n033,n034,n035,n036,n037,n038 logic
+  class n003,n005,n006,n008,n009,n011,n012,n013,n014,n015,n016,n017,n018,n019,n026,n039,n040,n041,n042 attr
+  class n029,n030,n031,n032 delay
+    </div>
+  </div>
+
+  <h2>Two things still open</h2>
+  <table>
+    <tr><th>Item</th><th>Detail</th></tr>
+    <tr><td><code>TODO [VOCAB]</code> guillotine</td>
+        <td>No SNOMED guillotine-amputation concept exists. Only CPT4 27882
+            (OMOP 2105448) and 27592 (OMOP 2105211). This module emits CPT4, but the
+            existing module only ever emits SNOMED-CT/RxNorm/LOINC, so CPT4 is
+            unproven through this ETL. If it is dropped, the 22&ndash;365 day window is
+            untestable. Deliberately <i>not</i> substituted with a definitive code.</td></tr>
+    <tr><td><code>TODO [ETL]</code> laterality</td>
+        <td>Synthea has no procedure-laterality field, so the ipsilateral / unknown /
+            bilateral arms and the contralateral decoy are indistinguishable downstream
+            until the ETL populates a modifier or ICD-10-PCS body-part character.</td></tr>
+  </table>
+
+  <footer>
+    Rendered with <a href="https://mermaid.js.org">Mermaid.js</a> (CDN &mdash; needs an
+    internet connection). Regenerate after any module edit so the diagram cannot drift
+    from the JSON.
+  </footer>
+  <script>mermaid.initialize({ startOnLoad: true, maxTextSize: 200000 });</script>
+</body>
+</html>
