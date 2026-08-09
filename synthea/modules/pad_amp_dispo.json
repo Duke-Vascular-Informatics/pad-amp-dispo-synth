@@ -3462,7 +3462,7 @@
       "distributed_transition": [
         {
           "distribution": 0.0156,
-          "transition": "Death_State"
+          "transition": "Set_Death_1y"
         },
         {
           "distribution": 0.9844,
@@ -3481,7 +3481,7 @@
       "distributed_transition": [
         {
           "distribution": 0.0289,
-          "transition": "Death_State"
+          "transition": "Set_Death_1y"
         },
         {
           "distribution": 0.9711,
@@ -3497,13 +3497,13 @@
         "work for free: a patient who dies never re-enters the monthly loop and so",
         "is correctly no longer at risk of re-amputation."
       ],
-      "direct_transition": "Set_Death_1y"
+      "direct_transition": "Terminal"
     },
     "Set_Death_1y": {
       "type": "SetAttribute",
       "attribute": "amp_death_1y",
       "value": true,
-      "direct_transition": "Terminal"
+      "direct_transition": "Death_State"
     },
     "Decoy_Hazard_Check": {
       "type": "Simple",
