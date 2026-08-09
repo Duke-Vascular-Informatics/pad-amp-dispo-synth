@@ -751,11 +751,11 @@
       ],
       "distributed_transition": [
         {
-          "distribution": 0.0156,
+          "distribution": 0.0053,
           "transition": "Set_Death_1y"
         },
         {
-          "distribution": 0.9844,
+          "distribution": 0.9947,
           "transition": "Decoy_Hazard_Check"
         }
       ]
@@ -770,11 +770,11 @@
       ],
       "distributed_transition": [
         {
-          "distribution": 0.0289,
+          "distribution": 0.0098,
           "transition": "Set_Death_1y"
         },
         {
-          "distribution": 0.9711,
+          "distribution": 0.9902,
           "transition": "Decoy_Hazard_Check"
         }
       ]
