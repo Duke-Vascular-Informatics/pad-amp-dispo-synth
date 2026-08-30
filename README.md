@@ -75,6 +75,16 @@ pad-amp-dispo-synth/
 
 Licensed under **GNU GPL v3.0** (see [LICENSE](LICENSE)).
 
+This repo vendors [Synthea](https://github.com/synthetichealth/synthea) (Copyright
+2017-2025 The MITRE Corporation) at `external/synthea/`, an independently developed,
+open-source synthetic patient generator distributed under its own **Apache License
+2.0** — a separate license from this repository's GPL v3.0, not a GPL dependency.
+Synthea's own `LICENSE` and `NOTICE` files are preserved unmodified in
+`external/synthea/`; the `NOTICE` file documents Synthea's own third-party content
+(RxNorm, LOINC, SNOMED CT terminology, and the SBSCL library). Synthea is not
+affiliated with Duke University; see the upstream project for its own terms,
+attribution requirements, and citation.
+
 Research reported here was supported by the National Center for Advancing Translational
 Sciences of the National Institutes of Health under Award Number K12TR005435. The content is
 solely the responsibility of the authors and does not necessarily represent the official views
