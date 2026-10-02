@@ -18,19 +18,16 @@ Shorter version:
 
 ## Template Repository Contributors
 
-Contributors listed below are derived from Git commit history and kept as recorded in
-git identity metadata.
+Contributors listed below are derived from this repository's own Git commit history.
+Regenerate with the source command below when preparing a release; do not hand-edit
+stale entries forward from a prior repository's history.
 
-Generated on: 2026-04-27
+Generated on: 2026-10-01
 Source command: `git shortlog -sne --all`
 
 | Commits | Contributor Identity |
 |---------|----------------------|
-| 203 | apj20 <apj20@uke.edu> |
-| 39 | Adam Johnson <adamjohnson@Adams-MacBook-Air.local> |
-| 15 | GitHub Copilot <assistant@github.copilot> |
-| 1 | Adam P. Johnson, MD, MPH <22971108+adam-mdmph@users.noreply.github.com> |
-| 1 | Sasank <39873492+sasank89@users.noreply.github.com> |
+| 14 | Adam P. Johnson, MD, MPH <22971108+adam-mdmph@users.noreply.github.com> |
 
 ## Notes
 
