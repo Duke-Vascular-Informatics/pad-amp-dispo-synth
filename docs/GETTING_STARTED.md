@@ -9,16 +9,16 @@ kept concise and links here for full step-by-step execution.
 
 Detailed command snippets are canonicalized in [COMMANDS.md](COMMANDS.md).
 Focused deep dives are split into dedicated docs:
-- GitHub auth details: [GIT_GITHUB_AUTH.md](GIT_GITHUB_AUTH.md)
-- Vocabulary load troubleshooting: [TROUBLESHOOTING_VOCAB_LOAD.md](TROUBLESHOOTING_VOCAB_LOAD.md)
-- ETL troubleshooting: [TROUBLESHOOTING_ETL.md](TROUBLESHOOTING_ETL.md)
+- GitHub auth details: [GIT_GITHUB_AUTH.md](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/GIT_GITHUB_AUTH.md)
+- Vocabulary load troubleshooting: [TROUBLESHOOTING_VOCAB_LOAD.md](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/TROUBLESHOOTING_VOCAB_LOAD.md)
+- ETL troubleshooting: [TROUBLESHOOTING_ETL.md](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/TROUBLESHOOTING_ETL.md)
 
 **Total time:** ~2 hours first time (mostly Docker vocabulary loading)  
 **Repeat-study time:** ~10-20 minutes when your machine is already set up  
 **Requires:** ~35 GB disk space, 8 GB RAM (16 GB recommended), active internet
 
-> **Using `omop-dev-workspace`?**  
-> The [omop-dev-workspace](https://github.com/Duke-Vascular-Informatics/omop-dev-workspace) provides SQL Server,
+> **Using `charon`?**  
+> The [charon](https://github.com/Duke-Vascular-Informatics/charon) provides SQL Server,
 > the OMOP vocabulary mount, and the dev container as shared infrastructure. If you are working
 > inside that workspace, **skip Steps 4, 6, and 7** (machine setup is already done).
 > Clone your study repo into the workspace folder, then jump to **Step 5** to create the repo
@@ -28,9 +28,9 @@ This guide prioritizes a post-clone workflow:
 1. Install VS Code
 2. Set up Git and understand version control basics
 3. Install and sign in to your AI coding assistant in VS Code
-4. Create `OMOP_Dev/` and clone the study repo *(skip if using omop-dev-workspace)*
+4. Create `OMOP_Dev/` and clone the study repo *(skip if using charon)*
 5. Use the AI assistant to help install Docker Desktop and Dev Containers
-6. Check shared setup and continue from there *(skip if using omop-dev-workspace)*
+6. Check shared setup and continue from there *(skip if using charon)*
 
 ---
 
@@ -101,7 +101,7 @@ Choose one authentication method for `git clone`, `git push`, and `git pull`.
 - Option B: HTTPS + token-backed auth (`gh auth login` or your credential manager)
 
 For complete setup and remote switching commands, use:
-[GIT_GITHUB_AUTH.md](GIT_GITHUB_AUTH.md)
+[GIT_GITHUB_AUTH.md](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/GIT_GITHUB_AUTH.md)
 
 ---
 
@@ -137,7 +137,7 @@ proceeding to Step 4.
 
 ## Step 4: Create Your Parent Development Folder (5 minutes)
 
-> **Skip this step if using `omop-dev-workspace`.** The workspace already provides the shared
+> **Skip this step if using `charon`.** The workspace already provides the shared
 > SQL Server container, vocabulary mount, and `.env` — clone your study repo directly into
 > the workspace folder and proceed to Step 5.
 
@@ -206,14 +206,14 @@ wait until Docker and the shared host resources exist is opening the repo in the
 4. Choose **Private** (recommended for studies with PHI definitions)
 5. Click **Create repository from template**
 
-### 5.2 Clone inside OMOP_Dev/ (or omop-dev-workspace/)
+### 5.2 Clone inside OMOP_Dev/ (or charon/)
 
 ```bash
 # Standalone: clone into OMOP_Dev/
 cd ~/OMOP_Dev
 
-# OR if using omop-dev-workspace:
-cd ~/path/to/omop-dev-workspace
+# OR if using charon:
+cd ~/path/to/charon
 
 # Replace <your-org> and <your-study> with your GitHub paths
 # HTTPS
@@ -243,11 +243,11 @@ OMOP_Dev/
     ...
 ```
 
-**omop-dev-workspace:** Clone the study repo directly into the workspace root. The workspace
+**charon:** Clone the study repo directly into the workspace root. The workspace
 already provides `.env`, `docker-compose.yml`, and `omop_vocab/`:
 
 ```
-omop-dev-workspace/
+charon/
   .env
   docker-compose.yml
   omop_vocab/
@@ -278,7 +278,7 @@ code --version          # Should print: X.XX.X
 
 ## Step 6: Check Whether Shared Local Setup Already Exists (2 minutes)
 
-> **Skip this step if using `omop-dev-workspace`.** The workspace manages SQL Server and the
+> **Skip this step if using `charon`.** The workspace manages SQL Server and the
 > vocabulary mount. Confirm the workspace dev container is running and proceed to Step 8.
 
 Run these checks from `OMOP_Dev/`. If they all pass, skip Step 7 and go directly to Step 8.
@@ -325,7 +325,7 @@ If any of those checks fail, continue to Step 7.
 
 ## Step 7: Complete Machine Setup If Needed (20-60 minutes)
 
-> **Skip this step if using `omop-dev-workspace`.** Machine setup is managed by the workspace.
+> **Skip this step if using `charon`.** Machine setup is managed by the workspace.
 
 Do this only if Step 6 found missing shared setup. This is one-time per machine, not per study.
 
@@ -557,7 +557,7 @@ If you see errors, check:
 - Files exist: `ls -la /omop_vocab/`
 
 If Step 10 fails or stalls, use the focused runbook:
-[TROUBLESHOOTING_VOCAB_LOAD.md](TROUBLESHOOTING_VOCAB_LOAD.md)
+[TROUBLESHOOTING_VOCAB_LOAD.md](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/TROUBLESHOOTING_VOCAB_LOAD.md)
 
 ### 10.2 Verify vocabulary was loaded
 
@@ -758,7 +758,7 @@ Rscript workflow/06_quality_check_defined_phenotypes.R
 ```
 
 If Step 13 fails, use the focused runbook:
-[TROUBLESHOOTING_ETL.md](TROUBLESHOOTING_ETL.md)
+[TROUBLESHOOTING_ETL.md](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/TROUBLESHOOTING_ETL.md)
 
 ---
 
@@ -832,10 +832,10 @@ The `transportable_bundle/` can be:
 
 Use focused troubleshooting docs to reduce duplicated guidance and merge conflicts:
 
-- Infrastructure and container setup: [SETUP.md](SETUP.md)
-- Vocabulary loading failures: [TROUBLESHOOTING_VOCAB_LOAD.md](TROUBLESHOOTING_VOCAB_LOAD.md)
-- Synthetic generation and ETL failures: [TROUBLESHOOTING_ETL.md](TROUBLESHOOTING_ETL.md)
-- Concept lookup workflow and verification: [../CLAUDE.md](../CLAUDE.md)
+- Infrastructure and container setup: [SETUP.md](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/SETUP.md)
+- Vocabulary loading failures: [TROUBLESHOOTING_VOCAB_LOAD.md](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/TROUBLESHOOTING_VOCAB_LOAD.md)
+- Synthetic generation and ETL failures: [TROUBLESHOOTING_ETL.md](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/TROUBLESHOOTING_ETL.md)
+- Concept lookup workflow and verification: [charon's CLAUDE.md](https://github.com/Duke-Vascular-Informatics/charon/blob/main/CLAUDE.md)
 
 ---
 

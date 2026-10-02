@@ -23,4 +23,4 @@ Supplementary project documentation that does not belong in the root README.
 | `TOPIC_OWNERSHIP.csv` | **Topic ownership matrix.** Maps sensitive topic headings to canonical owner docs to reduce content cloning. |
 | `workflow_steps.yaml` | **Machine-readable step map.** Canonical step labels/anchors used by docs validation guardrails. |
 
-> Infrastructure setup, Git/GitHub auth, and vocabulary troubleshooting are covered in the workspace-level `docs/` folder (`omop-dev-workspace/docs/`).
+> Infrastructure setup, Git/GitHub auth, and vocabulary troubleshooting are covered in the workspace-level `docs/` folder (`charon/docs/`).
