@@ -1,14 +1,15 @@
 # drivers/
 
-JDBC driver bundle for SQL Server connectivity. All contents except the downloaded zip
-are excluded from git (see `.gitignore`) and are provisioned automatically on first run
-by `R/drivers.R` via `setup/install_packages.R`.
+JDBC driver bundle for SQL Server connectivity. Every file in this directory is
+excluded from git (see `.gitignore`) and is provisioned automatically on first run
+by `R/drivers.R` via `setup/install_packages.R` — nothing here is vendored, so a
+fresh clone needs network access to Microsoft's download URL the first time only.
 
 ## Contents
 
 | Path | Description | Tracked |
 |------|-------------|---------|
-| `mssql-jdbc-13.2.1.zip` | Downloaded Microsoft JDBC driver archive | Yes (download cache) |
+| `mssql-jdbc-13.2.1.zip` | Downloaded Microsoft JDBC driver archive | No (re-downloaded if missing) |
 | `sqljdbc_13.2/` | Extracted driver directory (jre11 jar + Windows auth DLL) | No |
 | `jdbc-runtime/` | Runtime jar staged for DatabaseConnector discovery | No |
 

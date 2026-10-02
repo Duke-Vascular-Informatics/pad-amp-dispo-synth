@@ -14,8 +14,12 @@ output/
 plp_output/
 results/
 
-# JDBC driver bundle – exclude extracted files and the runtime jar, but keep
-# the downloaded zip so re-extraction can run without re-downloading.
+# JDBC driver bundle – the zip itself is no longer vendored (a ~7MB binary in
+# a public repo for no benefit over fetching it): R/drivers.R's
+# download_jdbc_zip() already downloads it fresh from Microsoft's official URL
+# whenever it's missing, so a first run after a fresh clone just re-downloads
+# it once, same as any other missing-dependency bootstrap step.
+drivers/*.zip
 drivers/sqljdbc_13.2/
 drivers/jdbc-runtime/
 drivers/synthea-sanitized/
