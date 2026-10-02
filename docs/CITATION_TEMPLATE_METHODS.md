@@ -7,7 +7,7 @@ or internal methods documentation.
 
 Use this sentence (edit bracketed values):
 
-"Analysis code was developed using the OMOP Study Template repository (GPL-3.0),
+"Analysis code was developed using the OMOP Study Template repository (GPL-2.0),
 version [VERSION], available at [REPO_URL], with contributions from the template
 repository contributors documented in `docs/CITATION_TEMPLATE_METHODS.md` and
 machine-readable metadata in `CITATION.cff`."

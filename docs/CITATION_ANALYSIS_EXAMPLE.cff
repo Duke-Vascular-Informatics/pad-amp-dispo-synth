@@ -17,7 +17,7 @@ version: "0.1.0"
 date-released: "YYYY-MM-DD"
 repository-code: "https://github.com/<org>/<study-repo>"
 url: "https://github.com/<org>/<study-repo>"
-license: "GPL-3.0"
+license: "GPL-2.0-only"
 
 abstract: >
   Analysis code for [Study Name], developed from the OMOP Study Template for

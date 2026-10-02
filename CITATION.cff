@@ -11,16 +11,8 @@ authors:
   - given-names: "Adam P."
     family-names: "Johnson"
     name-suffix: "MD, MPH"
-    affiliation: "Duke University School of Medicine, Department of Surgery"
+    affiliation: "Duke University School of Medicine, Department of Surgery; Durham VA Medical Center"
     orcid: "https://orcid.org/0000-0002-3014-6372"
-  - given-names: "Sasank"
-    family-names: "Kalipatnapu"
-    name-suffix: "MD"
-    affiliation: "University of Massachusetts School of Medicine"
-  - given-names: "Ayman"
-    family-names: "Ali"
-    name-suffix: "MD"
-    affiliation: "Duke University School of Medicine, Department of Surgery"
 
 version: "1.0.0"
 date-released: "2026-10-02"
@@ -28,7 +20,7 @@ date-released: "2026-10-02"
 repository-code: "https://github.com/Duke-Vascular-Informatics/pad-amp-dispo-synth"
 url: "https://github.com/Duke-Vascular-Informatics/pad-amp-dispo-synth"
 
-license: GPL-3.0
+license: GPL-2.0-only
 
 abstract: >
   A data-generation-only repository: a Synthea module and a CSV-to-OMOP ETL that
