@@ -1,11 +1,11 @@
 cff-version: 1.2.0
 message: >
-  If you use this template repository in your research, please cite it using
-  the metadata below.
+  If you use this synthetic dataset generator in your research, please cite it
+  using the metadata below.
 
 title: >
-  Synthea-OMOP Study Development Template: An End-to-End Observational Study Pipeline for OMOP CDM
-  using OHDSI HADES and Synthea Synthetic Data
+  pad-amp-dispo-synth: A Synthea Module and OMOP ETL Producing a Synthetic CDM of
+  Major Lower Extremity Amputation Patients
 
 authors:
   - given-names: "Adam P."
@@ -23,21 +23,23 @@ authors:
     affiliation: "Duke University School of Medicine, Department of Surgery"
 
 version: "1.0.0"
-date-released: "2026-04-27"
+date-released: "2026-10-02"
 
-repository-code: "https://github.com/Duke-Vascular-Informatics/synthea-omop-template"
-url: "https://github.com/Duke-Vascular-Informatics/synthea-omop-template"
+repository-code: "https://github.com/Duke-Vascular-Informatics/pad-amp-dispo-synth"
+url: "https://github.com/Duke-Vascular-Informatics/pad-amp-dispo-synth"
 
 license: GPL-3.0
 
 abstract: >
-  A GitHub Template Repository providing an end-to-end pipeline for observational
-  studies on an OMOP CDM v5.4 SQL Server database. Supports cohort characterization,
-  prognostic modelling, and causal inference using the OHDSI HADES R toolstack.
-  Includes synthetic data generation via Synthea for reproducible development and
-  testing. Workflow steps cover environment setup, cohort definition, ETL to OMOP,
-  data quality assessment (ACHILLES, Data Quality Dashboard), analysis, and
-  manuscript-format report generation.
+  A data-generation-only repository: a Synthea module and a CSV-to-OMOP ETL that
+  produce a fully synthetic OMOP CDM v5.4 dataset of patients undergoing major
+  lower extremity amputation for dysvascular, diabetic, or wound indications, with
+  a modeled 90-day post-discharge emergency department visit outcome and a
+  Veterans Affairs Frailty Index comorbidity burden. It contains no real patient
+  data and exists so that downstream OHDSI Strategus study pipelines can be
+  developed and verified end to end before any run against real data. It was used
+  to develop and verify the pipeline for the non-home discharge risk score
+  validation study (pad-amp-nhd-val).
   Funding: Research reported in this publication was supported by the National
   Center For Advancing Translational Sciences of the National Institutes of Health
   under Award Number K12TR005435. The content is solely the responsibility of the
@@ -47,28 +49,14 @@ abstract: >
 keywords:
   - OMOP CDM
   - OHDSI
-  - observational study
-  - real-world data
-  - clinical informatics
-  - PatientLevelPrediction
-  - CohortMethod
-  - FeatureExtraction
   - Synthea
+  - synthetic data
+  - major lower extremity amputation
+  - peripheral artery disease
+  - clinical informatics
   - R
 
 references:
-  - type: software
-    title: "OHDSI PatientLevelPrediction"
-    authors:
-      - name: "Observational Health Data Sciences and Informatics (OHDSI)"
-    url: "https://github.com/OHDSI/PatientLevelPrediction"
-
-  - type: software
-    title: "OHDSI ETL-Synthea"
-    authors:
-      - name: "Observational Health Data Sciences and Informatics (OHDSI)"
-    url: "https://github.com/OHDSI/ETL-Synthea"
-
   - type: software
     title: "Synthea: Synthetic Patient Population Simulator"
     authors:
@@ -76,13 +64,7 @@ references:
     url: "https://github.com/synthetichealth/synthea"
 
   - type: software
-    title: "OHDSI Achilles"
+    title: "OHDSI ETL-Synthea"
     authors:
       - name: "Observational Health Data Sciences and Informatics (OHDSI)"
-    url: "https://github.com/OHDSI/Achilles"
-
-  - type: software
-    title: "OHDSI DataQualityDashboard"
-    authors:
-      - name: "Observational Health Data Sciences and Informatics (OHDSI)"
-    url: "https://github.com/OHDSI/DataQualityDashboard"
+    url: "https://github.com/OHDSI/ETL-Synthea"
