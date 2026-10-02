@@ -2,7 +2,7 @@
 
 This analysis folder inherits shared AI coding instructions from:
 
-- `../CLAUDE.md`
+- [charon's `CLAUDE.md`](https://github.com/Duke-Vascular-Informatics/charon/blob/main/CLAUDE.md)
 
 Use the workspace-level file as canonical guidance for Claude Code and other assistants.
 
@@ -37,7 +37,7 @@ Run **Steps 1-6 only** (module authoring, Synthea generation, ETL, QC). Steps 7-
 
 `cdm_schema` is pinned to **`omop_synth_pad_amp_dispo`** (NOT `..._synth`) even though
 this repo is `pad-amp-dispo-synth`. That physical schema is registered in
-`../synthetic_data/registry.yaml` (`id: pad_amp_dispo`) and is consumed by both
+the workspace's `synthetic_data/registry.yaml` (format: [charon's synthetic_data README](https://github.com/Duke-Vascular-Informatics/charon/blob/main/synthetic_data/README.md)) (`id: pad_amp_dispo`) and is consumed by both
 `pad-amp-ed-desc` and `pad-oler-aki-desc` via view-overlays — both consume it through
 an overlay schema, never the bare name directly, which is what made the 2026-07-31
 rename (`pad-amp-ed-synth`/`pad_amp_ed`/`omop_synth_pad_amp_ed_desc` → `pad-amp-dispo-synth`/
@@ -47,7 +47,7 @@ consumers' overlay targets first.
 
 ### After a Step 5/6 run
 
-Register/update the dataset entry in `../synthetic_data/registry.yaml` (`id: pad_amp_dispo`)
+Register/update the dataset entry in the workspace's `synthetic_data/registry.yaml` (format: [charon's synthetic_data README](https://github.com/Duke-Vascular-Informatics/charon/blob/main/synthetic_data/README.md)) (`id: pad_amp_dispo`)
 per that file's README — fill in `generation_params` and `last_generated.qc_summary`.
 A consumer points its `OMOP_CDM_SCHEMA_OVERRIDE` view-overlay at this schema via
 `Rscript synthetic_data/scripts/generate_overlay_schema.R`.

@@ -25,7 +25,7 @@ Run `workflow/01_setup_synthea_etl_qc_env.R` first after opening this repo in th
 `git submodule update --init external/synthea`.
 
 After a successful Step 5/6 run, update this dataset's entry (`id: pad_amp_dispo`) in
-`../synthetic_data/registry.yaml` — fill in `generation_params` and `last_generated.qc_summary`.
+the workspace's `synthetic_data/registry.yaml` (format: [charon's synthetic_data README](https://github.com/Duke-Vascular-Informatics/charon/blob/main/synthetic_data/README.md)) — fill in `generation_params` and `last_generated.qc_summary`.
 
 ---
 

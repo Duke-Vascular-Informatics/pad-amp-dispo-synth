@@ -26,7 +26,7 @@ Consumers point their `OMOP_CDM_SCHEMA_OVERRIDE` at a view-overlay built with
 `synthetic_data/scripts/generate_overlay_schema.R`. The schema name intentionally keeps the
 `_desc` suffix (not `_synth`) so those overlays don't break — see [CLAUDE.md](CLAUDE.md).
 
-The dataset is registered in `../synthetic_data/registry.yaml` as `id: pad_amp_dispo`.
+The dataset is registered in the workspace's `synthetic_data/registry.yaml` (format: [charon's synthetic_data README](https://github.com/Duke-Vascular-Informatics/charon/blob/main/synthetic_data/README.md)) as `id: pad_amp_dispo`.
 
 ## Scope: Steps 1-6 only
 
@@ -44,7 +44,7 @@ This repo runs the Synthea/ETL/QC half of the pipeline and nothing else. There i
 | 6 | `workflow/06_quality_check_defined_phenotypes.R` | Post-ETL data-quality + phenotype sanity checks |
 
 After a successful Step 5/6 run, update the dataset's `generation_params` and
-`last_generated.qc_summary` in `../synthetic_data/registry.yaml`.
+`last_generated.qc_summary` in the workspace's `synthetic_data/registry.yaml` (format: [charon's synthetic_data README](https://github.com/Duke-Vascular-Informatics/charon/blob/main/synthetic_data/README.md)).
 
 ## Repository structure
 
@@ -69,7 +69,7 @@ pad-amp-dispo-synth/
 - The analysis code, report templates, and portable-bundle tooling that a normal study repo
   carries have been removed here — this repo only generates data.
 - Workspace setup (Docker, SQL Server, OMOP vocabulary, dev container) is documented in the
-  root `omop-dev-workspace` README and `../docs/`.
+  root `charon` README and `../docs/`.
 
 ## License & Funding
 
