@@ -2,7 +2,7 @@
 
 ## Co-publication requirement
 
-This repository is licensed under the GNU General Public License v3.0 (GPL v3).
+This repository is licensed under the GNU General Public License v2 (GPL v2).
 Any manuscript that uses, adapts, or builds on this code must include a
 publicly accessible link to the full analysis source code — either this
 repository or a fork — at the time of journal submission. Code availability
@@ -27,5 +27,5 @@ clinical rationale can be discussed before code is written.
 
 ## License
 
-Modifications and derivative works must be released under GPL v3. See
+Modifications and derivative works must be released under GPL v2. See
 [`LICENSE`](LICENSE) for the full terms.
