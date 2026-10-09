@@ -33,14 +33,6 @@ get_validation_config <- function() {
 
   p <- yaml::read_yaml(params_file)
 
-  # Helper: coerce a YAML value (may be NULL / list / scalar) to integer vector.
-  # Returns integer(0) when the YAML field is null or an empty sequence [].
-  as_int_vec <- function(x) {
-    if (is.null(x)) return(integer(0))
-    v <- suppressWarnings(as.integer(unlist(x)))
-    v[!is.na(v)]
-  }
-
   # Helper: return y when x is NULL.
   `%||%` <- function(x, y) if (is.null(x)) y else x
 
@@ -69,7 +61,7 @@ get_validation_config <- function() {
 
   # Slugify a study_name into a SQL-Server-safe identifier stem: lowercase,
   # with hyphens / dots / whitespace collapsed to single underscores.  Used to
-  # derive default results_schema, cohort_table, and output_folder names from
+  # derive default results_schema and output_folder names from
   # study_name when those fields are omitted from study_params.yaml.
   .slugify <- function(x) {
     s <- tolower(x)
@@ -116,106 +108,25 @@ get_validation_config <- function() {
     # Study identity — from study_params.yaml
     # -------------------------------------------------------------------------
     study_name   = study_name_value,
-    study_design = p$study_design %||% "prognostic_model",
 
     # -------------------------------------------------------------------------
     # Database schemas — from study_params.yaml.
-    # results_schema and cohort_table auto-derive from study_name (via
-    # study_slug) when omitted; cdm_schema must be set explicitly because the
+    # results_schema auto-derives from study_name (via study_slug) when omitted; cdm_schema must be set explicitly because the
     # CDM is typically a shared dataset populated by a separate ETL.
     # -------------------------------------------------------------------------
     cdm_schema        = p$cdm_schema     %||% "cdm_my_study",
     cdm_version       = 5L,
     results_schema    = .bq(p$results_schema %||% paste0(study_slug, "_results")),
-    results_database  = p$results_database %||% NA_character_,
-    cohort_table      = p$cohort_table   %||% paste0(study_slug, "_cohort"),
-
-    # -------------------------------------------------------------------------
-    # Cohort IDs — from study_params.yaml
-    # -------------------------------------------------------------------------
-    target_cohort_id     = as.integer(p$target$cohort_id %||% 1L),
-    comparator_cohort_id = if (!is.null(p$comparator$cohort_id))
-                             as.integer(p$comparator$cohort_id) else NA_integer_,
-    outcome_cohort_id    = if (!is.null(p$outcome$cohort_id))
-                             as.integer(p$outcome$cohort_id) else NA_integer_,
-
-    # -------------------------------------------------------------------------
-    # Cohort SQL file paths — from study_params.yaml
-    # -------------------------------------------------------------------------
-    target_cohort_sql     = p$target$sql_file     %||% "cohorts/target_surgery.sql",
-    comparator_cohort_sql = p$comparator$sql_file %||% "cohorts/comparator_cohort.sql",
-    outcome_cohort_sql    = p$outcome$sql_file,
-
-    # -------------------------------------------------------------------------
-    # Target cohort phenotype parameters — passed as SqlRender params at runtime
-    # -------------------------------------------------------------------------
-    target_visit_concept_ids    = as_int_vec(p$target$visit_concept_ids),
-    target_min_age              = as.integer(p$target$min_age_at_index %||% 0L),
-    target_index_concept_ids    = as_int_vec(p$target$index_event$ancestor_concept_ids),
-    target_index_domain         = p$target$index_event$domain %||% "procedure",
-    target_washout_concept_ids  = as_int_vec(p$target$washout$ancestor_concept_ids),
-    target_washout_lookback_days = as.integer(
-                                    p$target$washout$lookback_days %||% 365L),
-
-    # -------------------------------------------------------------------------
-    # Comparator cohort phenotype parameters — passed as SqlRender params at runtime.
-    # These are only used when comparator.cohort_id is set in study_params.yaml.
-    # -------------------------------------------------------------------------
-    comparator_visit_concept_ids     = as_int_vec(p$comparator$visit_concept_ids),
-    comparator_min_age               = as.integer(p$comparator$min_age_at_index %||% 0L),
-    comparator_index_concept_ids     = as_int_vec(p$comparator$index_event$ancestor_concept_ids),
-    comparator_index_domain          = p$comparator$index_event$domain %||% "procedure",
-    comparator_washout_concept_ids   = as_int_vec(p$comparator$washout$ancestor_concept_ids),
-    comparator_washout_lookback_days = as.integer(
-                                         p$comparator$washout$lookback_days %||% 365L),
-
-    # -------------------------------------------------------------------------
-    # Outcome cohort phenotype parameters
-    # -------------------------------------------------------------------------
-    outcome_concept_ids = as_int_vec(p$outcome$ancestor_concept_ids),
-
-    # -------------------------------------------------------------------------
-    # Existing ATLAS cohorts (optional).
-    # If use_atlas_cohorts = TRUE the target cohort is copied from ATLAS.
-    # -------------------------------------------------------------------------
-    use_atlas_cohorts       = FALSE,
-    atlas_cohort_schema     = "results",
-    atlas_cohort_table      = "cohort",
-    atlas_target_cohort_id  = NA_integer_,
-    atlas_outcome_cohort_id = NA_integer_,
-
-    # -------------------------------------------------------------------------
-    # Covariate / feature definition files (pre-specified covariate list).
-    # Used when you have a version-controlled, protocol-specified set of
-    # covariates rather than automated FeatureExtraction across all domains.
-    # Set either to NULL in workflow/08 to skip this pipeline and use
-    # FeatureExtraction::createCovariateSettings() directly instead.
-    # -------------------------------------------------------------------------
-    covariate_definitions_file = file.path("covariates", "covariates.csv"),
-    covariate_concepts_file    = file.path("covariates", "covariate_concepts.csv"),
-
-    # -------------------------------------------------------------------------
-    # Analysis parameters — from study_params.yaml
-    # -------------------------------------------------------------------------
-    prediction_window_days     = as.integer(p$prediction_window_days     %||% 90L),
-    min_prior_observation_days = as.integer(p$min_prior_observation_days %||% 365L),
-    covariate_lookback_days    = as.integer(p$covariate_lookback_days    %||% 365L),
-
-    # -------------------------------------------------------------------------
-    # Study date window — from study_params.yaml
-    # -------------------------------------------------------------------------
-    study_start_date = p$study_start_date %||% "2017-01-01",
-    study_end_date   = p$study_end_date   %||% "2025-12-31",
 
     # -------------------------------------------------------------------------
     # Output folders — from study_params.yaml.
-    # output_folder:          study analysis results (Step 8)
-    # achilles_output_folder: CDM-level ACHILLES profiling (Step 6b)
-    # dqd_output_folder:      CDM-level Data Quality Dashboard (Step 6c)
+    # output_folder:          generation and QC outputs
+    # achilles_output_folder: CDM-level ACHILLES profiling (workflow 06)
+    # dqd_output_folder:      CDM-level Data Quality Dashboard (workflow 06)
     #
     # All three are runtime-only and excluded from git via .gitignore (output/).
-    # QC outputs are nested under output/qc/ to keep them separate from study
-    # deliverables while avoiding a new root-level directory.
+    # QC outputs are nested under output/qc/ to keep them separate from generation
+    # outputs while avoiding a new root-level directory.
     # -------------------------------------------------------------------------
     output_folder          = file.path(getwd(), p$output_folder %||% "output"),
     achilles_output_folder = file.path(getwd(), "output", "qc", "achilles"),
@@ -227,42 +138,6 @@ get_validation_config <- function() {
     cdm_database_id          = p$cdm_database_id          %||% "my_cdm_v5.4",
     cdm_database_name        = p$cdm_database_name        %||% "My Study Database",
     cdm_database_description = p$cdm_database_description %||%
-                                 "Brief description of the patient population.",
-
-    # -------------------------------------------------------------------------
-    # Negative control outcomes — from study_params.yaml negative_controls: section.
-    # Used for empirical calibration in the causal inference block.
-    # Returns integer(0) when the list is empty or the key is absent.
-    # -------------------------------------------------------------------------
-    negative_control_concept_ids = as_int_vec(p$negative_controls$ancestor_concept_ids),
-
-    # -------------------------------------------------------------------------
-    # Analysis flags — from study_params.yaml analyses: section.
-    # These drive workflow/08 — no code editing in that script is needed.
-    # -------------------------------------------------------------------------
-    run_cohort_diagnostics      = isTRUE(p$analyses$cohort_diagnostics),
-    run_cohort_characterization = isTRUE(p$analyses$cohort_characterization),
-    run_prognostic_model        = isTRUE(p$analyses$prognostic_model),
-    run_causal_inference        = isTRUE(p$analyses$causal_inference),
-    run_integer_risk_score      = isTRUE(p$analyses$integer_risk_score),
-    run_word_report             = isTRUE(p$analyses$word_report),
-    run_plp_model_validation    = isTRUE(p$analyses$plp_model_validation),
-    run_descriptive_ed_analysis = isTRUE(p$analyses$descriptive_ed_analysis),
-
-    # -------------------------------------------------------------------------
-    # Report generation — from study_params.yaml report: section.
-    # score_type is used only for study_design = "prognostic_model".
-    # -------------------------------------------------------------------------
-    score_type               = p$report$score_type             %||% "integer",
-    outcome_label            = p$report$outcome_label          %||% "Outcome",
-    model_type_description   = p$report$model_type_description %||% "integer risk score",
-    var_imp_file             = p$report$var_imp_file           %||% "model/varImp.rds",
-
-    # Narrative methods text — from study_params.yaml report: section.
-    # NULL means the field was not set; report templates substitute a placeholder string.
-    report_study_title                   = p$report$study_title                   %||% NULL,
-    report_target_population_description = p$report$target_population_description %||% NULL,
-    report_outcome_description           = p$report$outcome_description           %||% NULL,
-    report_score_description             = p$report$score_description             %||% NULL
+                                 "Brief description of the patient population."
   )
 }

@@ -40,7 +40,7 @@ for (path in targets) {
 }
 
 if (found == 0L) {
-  message("No TODO placeholders found — ready to run Step 8.")
+  message("No TODO placeholders found — ready to generate synthetic data.")
 } else {
   message(sprintf("\n%d TODO placeholder(s) remaining.", found))
 }

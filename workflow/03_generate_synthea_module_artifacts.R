@@ -43,21 +43,21 @@
 #      - Index_Diagnosis_Encounter : SNOMED-CT REPLACE_ME  — outpatient evaluation
 #      - Index_Admission_Encounter : SNOMED-CT REPLACE_ME  — inpatient admission
 #      - Outcome_Encounter         : SNOMED-CT REPLACE_ME  — outcome encounter
-#      Confirm encounter codes map to the visit_concept_ids used in target_surgery.sql
-#      and study_params.yaml > target > visit_concept_ids.
+#      Confirm encounter codes map to the visit types in the target cohorts of the
+#      studies in consumers.yaml (workflow/02 lists those cohorts).
 #
 #   4. COVARIATE ALIGNMENT
-#      - Confirm each Covariate_N_Onset concept code matches concept_id in
-#        covariates/covariate_concepts.csv for the corresponding covariate_N row.
+#      - Confirm each Covariate_N_Onset concept code is in the concept set of a covariate
+#        cohort of a study in consumers.yaml (the coverage check below reports this).
 #      - Confirm Covariate_2_Onset type is 'Procedure' if domain = 'procedure'.
 #      - Confirm Covariate_3_Onset type is 'MedicationOrder' if domain = 'drug'.
-#      - Confirm covariate_4 has a row in covariates/covariates.csv.
+#      - Delete any spare Covariate_N state that no consuming study has a cohort for.
 #
 #   5. TIMING PARAMETERS
 #      - Pre_Index_Workup_Delay: does the range match the typical time from
 #        diagnosis to procedure in your study population?
 #      - Post_Discharge_Observation_Delay: does the range align with
-#        prediction_window_days in study_params.yaml?
+#        the time at risk of the consuming studies?
 #      - Post_Index_Inpatient_Delay: is the inpatient stay duration realistic?
 #
 # HOW TO REVISE
@@ -401,6 +401,30 @@ rscript_bin <- if (.Platform$OS.type == "windows") "Rscript.exe" else "Rscript"
 status <- system2(file.path(R.home("bin"), rscript_bin), args = args)
 if (!identical(status, 0L)) {
   stop("Failed to generate Synthea diagram HTML.")
+}
+
+# -----------------------------------------------------------------------------
+# Chunk 8b - Coverage of the consuming studies' cohorts
+# Purpose:
+# Before spending time on data generation, confirm the Synthea modules that will
+# run (this custom module AND Synthea's built-in modules, since workflow/04 runs
+# them all) can emit the concepts every study in consumers.yaml needs.
+# Code path notes:
+# - Report-only by default; pass --enforce_coverage=true to stop on a cohort the
+#   module cannot produce. Skip entirely with --skip_coverage_check=true.
+# - Needs the OMOP vocabulary on the SQL Server; if the database is unreachable the
+#   check warns and is skipped (it fails only under --enforce_coverage=true).
+# - Covered means the module CAN emit the concept; the final counts are checked by
+#   consumer-study QC in workflow/06.
+# -----------------------------------------------------------------------------
+cli_args <- commandArgs(trailingOnly = TRUE)
+if (!any(grepl("^--skip_coverage_check=(true|1|yes)$", cli_args, ignore.case = TRUE))) {
+  cov_args <- c("scripts/module_coverage_check.R",
+                grep("^--(enforce_coverage|consumers|synthea_home)=", cli_args, value = TRUE))
+  cov_status <- system2(file.path(R.home("bin"), rscript_bin), args = cov_args)
+  if (!identical(cov_status, 0L)) {
+    stop("Module coverage check failed: the module cannot produce cohorts a consuming study needs.")
+  }
 }
 
 # -----------------------------------------------------------------------------

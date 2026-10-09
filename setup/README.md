@@ -15,11 +15,13 @@ For Docker, SQL Server, and vocabulary infrastructure details, use
 
 ## Related setup script (outside this folder)
 
-| File | Description | When to run |
-|------|-------------|-------------|
-| `../infrastructure/scripts/setup_omop_vocab_schema.R` | Loads the OMOP standard vocabulary into the shared `omop_vocab` schema on SQL Server. Creates and populates vocabulary tables from Athena CSV files. | Once per SQL Server instance |
+Run from the **workspace root** (your charon clone), not from inside this repo.
 
-## Prerequisites for ../infrastructure/scripts/setup_omop_vocab_schema.R
+| Script | Description | When to run |
+|--------|-------------|-------------|
+| `infrastructure/scripts/setup_omop_vocab_schema.R --study-dir synthea-omop-template` | Loads the OMOP standard vocabulary into the shared `omop_vocab` schema on SQL Server. Creates and populates vocabulary tables from Athena CSV files. | Once per SQL Server instance |
+
+## Prerequisites for setup_omop_vocab_schema.R
 
 - OMOP vocabulary CSV files downloaded from [Athena](https://athena.ohdsi.org)
 - Sufficient disk space (~25 GB for full vocabulary load)

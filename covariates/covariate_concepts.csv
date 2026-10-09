@@ -1,5 +1,0 @@
-# See covariates/README.md for column definitions and usage guide.
-# This repo never runs Step 7/8 (data-generation-only) — intentionally empty.
-# Authoritative concept mappings live in the analysis repo:
-# pad-amp-ed-desc/covariates/covariate_concepts.csv.
-covariate_id,concept_id,include_descendants,concept_role,value_concept_ids

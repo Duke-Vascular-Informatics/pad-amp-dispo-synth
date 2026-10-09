@@ -13,11 +13,11 @@ For full procedural detail see `docs/GETTING_STARTED.md`. For canonical command 
 
 ### Decision Tree
 
-1. New machine or first run?
-   - Follow `docs/GETTING_STARTED.md` Steps 1–9.
+1. New machine or no charon workspace yet?
+   - Complete the charon workspace setup first (charon Getting Started Steps 1–9), including matching R/Java/Python to your secure environment (charon Step 6.0). Then start at Step 2 here.
 
-2. Existing machine, new study?
-   - Start at Step 10 in `docs/GETTING_STARTED.md`.
+2. Workspace ready, new dataset?
+   - Start at Step 2 in `docs/GETTING_STARTED.md` (check the registry first: another dataset may already fit).
 
 3. Unsure what is missing?
 
@@ -45,19 +45,17 @@ Use `Terminal -> Run Task`:
 - Analyst: Check Setup
 - Analyst: Concept Lookup
 - Analyst: Validate Step 2 Artifacts
-- Analyst: Run Step 8 Analysis
-- Analyst: Build Portable Bundle (bash / PowerShell)
 - Analyst: Create Support Bundle
 
 ### Common Paths
 
-**Real CDM path**
-- Skip synthetic generation steps.
-- Run Step 2 validation and Step 8 analysis.
+**Generate a synthetic dataset** (this repo's only documented path)
+- Define and validate cohorts and covariates (`workflow/02`).
+- Run `workflow/03`–`06` for module validation, Synthea generation, ETL, and QC.
+- Register the result in `synthetic_data/registry.yaml` at the workspace root.
 
-**Synthetic data path**
-- Run Steps 3–6 for generation and ETL.
-- Then run Step 8 analysis.
+Analysis against this (or any) dataset happens in a separate repo built from
+`strategus-study-template`, not here.
 
 ### Hooks for Local Guardrails
 
