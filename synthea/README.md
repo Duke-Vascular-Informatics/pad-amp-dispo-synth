@@ -23,7 +23,7 @@ The template simulates a generic surgical or procedural study pathway:
 4. **Treatment strategy** — oversampling branch (non-exposed vs. target-exposed)
 5. **Pre-procedure workup** — delay from diagnosis to index event
 6. **Index procedure** — inpatient encounter + procedure
-7. **Post-discharge observation** — window aligned with `prediction_window_days`
+7. **Post-discharge observation** — window matching the consuming studies' time at risk
 8. **Outcome assessment** — fixed-probability gate (tunable incidence)
 9. **Outcome management** — encounter, treatment, resolution
 
@@ -42,24 +42,25 @@ Work through these eight items before running Step 4 (Synthea data generation):
 
 3. **Covariate 1** (`Covariate_1_Check` / `Covariate_1_Onset`) — set the
    distribution to the prevalence of `covariate_1` in your population; replace
-   `REPLACE_ME` with the concept code matching `covariate_concepts.csv` row
-   `covariate_1`.
+   `REPLACE_ME` with a concept code inside the concept set of the matching
+   covariate cohort of a study in `consumers.yaml` (`workflow/02` lists them;
+   `workflow/03` checks the coverage).
 
 4. **Covariates 2–4** — repeat step 3 for `Covariate_2` through `Covariate_4`.
-   Note: `covariate_2` domain is `procedure` and `covariate_3` domain is `drug`
-   in the default `covariates.csv` — change the state type accordingly.
-   `covariate_4` also requires a new row in `covariates/covariates.csv`.
+   Note: use a `Procedure` state for a procedure covariate and a `MedicationOrder`
+   state for a drug covariate. Keep a covariate state only if a consuming study has
+   a matching covariate cohort; delete the spare ones.
 
 5. **Index procedure** (`Index_Procedure`) — replace `REPLACE_ME` with the
-   SNOMED-CT procedure code. Must match `study_params.yaml > target > index_event
-   > ancestor_concept_ids`. Run:
+   SNOMED-CT procedure code. It must map to a concept in or below the entry-event
+   concept set of the target cohort of every study in `consumers.yaml`. Run:
    ```
    Rscript scripts/concept_lookup.R "<procedure name>" Procedure
    ```
 
 6. **Outcome** (`Outcome_Onset`) — replace `REPLACE_ME` with the SNOMED-CT
-   concept code for the study outcome. Must match `study_params.yaml > outcome >
-   ancestor_concept_ids`. Run:
+   concept code for the study outcome. It must map to a concept in or below the
+   concept set of an outcome cohort of a study in `consumers.yaml`. Run:
    ```
    Rscript scripts/concept_lookup.R "<outcome name>" Condition
    ```
@@ -86,4 +87,6 @@ After editing `study_template.json`:
    ```bash
    grep -c "REPLACE_ME" synthea/modules/study_template.json
    ```
-   This should return 0 before proceeding to Step 4.
+   This should return 0 before proceeding to Step 4. `workflow/03` then checks, before any
+   data is generated, that the custom module **and** Synthea's built-in modules can produce
+   the cohorts of every study in `consumers.yaml` (`--enforce_coverage=true` stops on a gap).

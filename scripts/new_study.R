@@ -39,7 +39,7 @@ if (!file.exists(template)) {
 lines <- readLines(template, warn = FALSE)
 
 # Pre-fill study_name with the supplied value.
-# results_schema, cohort_table, and output_folder all auto-derive from study_name
+# results_schema and output_folder auto-derive from study_name
 # in config.R via .slugify(), so pre-filling output_folder here is redundant and
 # would create a stale literal if study_name is later changed.
 lines <- gsub('"my_study"', paste0('"', study_name, '"'), lines, fixed = TRUE)
@@ -124,6 +124,7 @@ message("       git add . && git commit -m 'feat: add modules for ", study_name,
 message("       git push origin ", study_branch)
 message("       cd ../..")
 message("       git add external/synthea && git commit -m 'chore: update synthea-pad submodule'")
-message("  4. Rscript workflow/02_define_omop_cohort_outcome_covariates.R  — validate")
-message("  5. Edit covariates/covariates.csv and covariates/covariate_concepts.csv")
-message("  6. Rscript workflow/08_run_analysis_and_manuscript_report.R")
+message("  4. List the Strategus studies that will use this dataset in consumers.yaml")
+message("  5. Rscript workflow/02_define_omop_cohort_outcome_covariates.R  — shows their cohorts")
+message("  6. Run Steps 3-6 to check the module, generate, ETL, and QC the synthetic dataset,")
+message("     then register it in synthetic_data/registry.yaml")

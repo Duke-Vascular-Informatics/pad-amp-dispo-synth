@@ -2,40 +2,35 @@
 # =============================================================================
 # workflow/02_define_omop_cohort_outcome_covariates.R
 #
-# Step 2: Declare and validate the phenotype artifacts for your study.
+# Step 2: Declare and validate WHAT this synthetic dataset must support.
 #
 # PURPOSE
 # -------
-# This step is the single source of truth for WHAT the study measures:
-#   • Which patients are in scope (target / exposure cohort)
-#   • What is being compared to or against (comparator cohort, if any)
-#   • What outcome is being tracked (outcome cohort, if any)
-#   • Which covariates / features are extracted (covariate definitions, if any)
+# A -synth repo does not define cohorts, outcomes or covariates of its own. What
+# the dataset must contain is defined by the studies that will use it, listed in
+# consumers.yaml, and their cohort definitions (inst/Cohorts.csv and
+# inst/cohorts/*.json in each Strategus repo) are read directly, so nothing is
+# copied here and nothing can drift out of sync.
 #
-# It does NOT connect to a database. It reads files, validates their structure,
-# and prints a manifest so you can confirm the artifacts before running Step 8.
+# This step reads consumers.yaml and prints, for every consuming study, the
+# cohorts the Synthea module must be able to produce and the final data must
+# contain, by role:
+#   target     - the study's one target cohort
+#   outcome    - its outcome cohorts
+#   covariate  - every other cohort in its Cohorts.csv (Strategus treats the
+#                remaining cohorts as covariate cohorts)
+# and reports anything that would stop the later checks from running (a study
+# repo that is not cloned, a missing manifest or cohort JSON, a target or outcome
+# id that cannot be resolved).
 #
-# This step supports any OMOP-based study design:
-#   • Cohort characterization  — target cohort only
-#   • Prognostic modelling     — target cohort + outcome + covariates
-#   • Causal inference         — target + comparator + outcome + covariates
-#   • Descriptive comparison   — target + comparator (no formal outcome)
+# It does NOT connect to a database. The later steps use the same list:
+#   workflow/03  checks the Synthea module can produce these cohorts
+#                (scripts/module_coverage_check.R)
+#   workflow/06  checks the final data contains them
+#                (scripts/consumer_cohort_qc.R)
 #
+# It also registers this repo in the workspace studies.yaml on first run.
 # =============================================================================
-# STUDY PARAMETERS — read from study_params.yaml via config.R
-# =============================================================================
-# All study-specific settings (study design, cohort SQL paths, concept IDs,
-# analysis parameters) live in study_params.yaml. This script reads them via
-# get_validation_config() below and uses them for validation only.
-#
-# To change any setting: edit study_params.yaml, then re-run this script.
-# =============================================================================
-
-
-# =============================================================================
-# — INFRASTRUCTURE BELOW — no changes needed unless extending validation —
-# =============================================================================
-
 
 # -----------------------------------------------------------------------------
 # Chunk 1 - Workflow bootstrap
@@ -55,343 +50,63 @@ bootstrap_path <- local({
 source(bootstrap_path)
 set_workflow_root()
 
-# Read all study parameters from config.R (which reads study_params.yaml).
-# Step 8 (build_cohorts) reads the same config, so the values never diverge.
+# Read the repo settings (schemas, study name) from config.R, which reads
+# study_params.yaml. Every later workflow step reads the same config.
 source("config.R")
 config <- get_validation_config()
-target_cohort_sql_path     <- config$target_cohort_sql
-comparator_cohort_sql_path <- config$comparator_cohort_sql
-outcome_cohort_sql_path    <- config$outcome_cohort_sql
-study_design               <- config$study_design
-prediction_window_days     <- config$prediction_window_days
-min_prior_observation_days <- config$min_prior_observation_days
-covariate_lookback_days    <- config$covariate_lookback_days
-covariate_definitions_path  <- config$covariate_definitions_file
-covariate_concepts_path    <- config$covariate_concepts_file
-
-# Guard: comparator is active only when comparator.cohort_id is explicitly set
-# in study_params.yaml (not null/NA). Studies without a comparator skip all
-# comparator artifact loading and validation silently.
-comparator_enabled <- !is.na(config$comparator_cohort_id)
-
-# Guard: points column in covariates.csv is only required when the integer
-# risk score analysis is enabled. Continuous PLP studies don't use it.
-require_points <- isTRUE(config$run_integer_risk_score)
-
-# Read the raw YAML once so read_model_reference() can access the full tree.
-study_params_raw <- yaml::read_yaml("study_params.yaml")
-
+source("R/consumer_qc.R")
 
 # -----------------------------------------------------------------------------
-# Chunk 1b - Model reference reader
-# Purpose: surface metadata about the model or score being externally validated.
-# Two-tier approach:
-#   Tier 1 — YAML block: reads model_reference: from study_params.yaml (works
-#             for any model type: integer_risk_score, plp_*, logistic, etc.)
-#   Tier 2 — PLP .rds fallback: when model_reference: is absent but a model/
-#             folder contains PLP artefacts, extracts metadata from the .rds
-#             files produced by PatientLevelPrediction.
-# Returns a named list or NULL when no reference metadata is found.
+# Chunk 2 - Read consumers.yaml
 # -----------------------------------------------------------------------------
-
-`%||%` <- function(x, y) if (is.null(x)) y else x   # null-coalescing helper
-
-read_model_reference <- function(study_params_raw, model_dir = "model") {
-
-  # Tier 1: YAML-declared reference (type-agnostic — integer score, PLP, or any other)
-  if (!is.null(study_params_raw$model_reference)) {
-    ref <- study_params_raw$model_reference
-    ref[["source"]] <- "study_params.yaml"
-    return(ref)
-  }
-
-  # Tier 2: PLP .rds artefacts (legacy / supplemental fallback)
-  if (!dir.exists(model_dir)) return(NULL)
-
-  read_rds_safe <- function(path) tryCatch(readRDS(path), error = function(e) NULL)
-
-  pop_settings <- read_rds_safe(file.path(model_dir, "populationSettings.rds"))
-  meta_data    <- read_rds_safe(file.path(model_dir, "metaData.rds"))
-  var_imp      <- read_rds_safe(file.path(model_dir, "varImp.rds"))
-  cohort_id    <- read_rds_safe(file.path(model_dir, "cohortId.rds"))
-  outcome_id   <- read_rds_safe(file.path(model_dir, "outcomeId.rds"))
-
-  if (is.null(pop_settings) && is.null(meta_data) && is.null(var_imp)) return(NULL)
-
-  outcome_ids <- NULL
-  if (!is.null(meta_data) && !is.null(meta_data$call$outcomeIds)) {
-    outcome_ids <- as.integer(meta_data$call$outcomeIds)
-  } else if (!is.null(outcome_id)) {
-    outcome_ids <- as.integer(outcome_id)
-  }
-
-  total_covariates <- included_covariates <- NA_integer_
-  if (is.data.frame(var_imp)) {
-    total_covariates    <- nrow(var_imp)
-    included_covariates <- sum(var_imp$included == 1, na.rm = TRUE)
-  }
-
-  covariate_flags <- character(0)
-  if (!is.null(meta_data) && !is.null(meta_data$call$covariateSettings)) {
-    cs <- meta_data$call$covariateSettings
-    if (length(cs) >= 1)
-      covariate_flags <- names(cs[[1]])[vapply(cs[[1]], isTRUE, logical(1))]
-  }
-
-  list(
-    source                             = "plp_rds",
-    model_type                         = "plp",
-    source_folder                      = model_dir,
-    target_cohort_id                   = as.integer(cohort_id %||% pop_settings$cohortId),
-    outcome_ids                        = outcome_ids,
-    risk_window_start_day              = as.integer(pop_settings$riskWindowStart %||% NA_integer_),
-    risk_window_end_day                = as.integer(pop_settings$riskWindowEnd   %||% NA_integer_),
-    washout_period_days                = as.integer(pop_settings$washoutPeriod   %||% NA_integer_),
-    first_exposure_only                = isTRUE(pop_settings$firstExposureOnly),
-    remove_subjects_with_prior_outcome = isTRUE(pop_settings$removeSubjectsWithPriorOutcome),
-    total_covariates                   = total_covariates,
-    included_covariates                = included_covariates,
-    covariate_flags                    = covariate_flags
-  )
+# consumers.yaml ships with the template, so a missing file is a stop, not a
+# warning. An empty list is only a warning: the dataset then has no downstream
+# study to be checked against.
+# -----------------------------------------------------------------------------
+if (!file.exists("consumers.yaml")) {
+  stop("consumers.yaml not found. It lists the Strategus studies that will use this ",
+       "dataset and defines what the Synthea module and the final data must contain. ",
+       "Restore it from the template and add your consuming studies.")
 }
-
-model_reference <- read_model_reference(study_params_raw)
-
+consumer_cfg <- read_consumers("consumers.yaml")
 
 # -----------------------------------------------------------------------------
-# Chunk 2 - Resolve required vs. optional artifact list for this design
+# Chunk 3 - What the module and the dataset must cover
 # -----------------------------------------------------------------------------
-required_artifacts  <- list()
-optional_artifacts  <- list()
-
-# Target cohort is always required.
-required_artifacts[["target_cohort"]] <- target_cohort_sql_path
-
-# Comparator, outcome, and covariate files depend on study design.
-if (study_design %in% c("causal_inference", "descriptive") && comparator_enabled) {
-  if (!is.null(comparator_cohort_sql_path)) {
-    required_artifacts[["comparator_cohort"]] <- comparator_cohort_sql_path
-  } else {
-    warning(
-      "[Step 2] study_design = '", study_design, "' with comparator enabled requires a comparator SQL file.\n",
-      "  Set comparator.sql_file in study_params.yaml or change study_design."
-    )
-  }
-} else if (study_design %in% c("causal_inference", "descriptive") && !comparator_enabled) {
-  warning(
-    "[Step 2] study_design = '", study_design, "' typically requires a comparator cohort.\n",
-    "  Set comparator.cohort_id in study_params.yaml or change study_design."
-  )
-}
-
-if (study_design %in% c("prognostic_model", "causal_inference")) {
-  if (!is.null(outcome_cohort_sql_path)) {
-    required_artifacts[["outcome_cohort"]] <- outcome_cohort_sql_path
-  } else {
-    warning(
-      "[Step 2] study_design = '", study_design, "' requires an outcome cohort.\n",
-      "  TODO [PHENOTYPE PATHS]: Set outcome_cohort_sql_path or change study_design."
-    )
-  }
-}
-
-if (!is.null(covariate_definitions_path))
-  optional_artifacts[["covariate_definitions"]] <- covariate_definitions_path
-if (!is.null(covariate_concepts_path))
-  optional_artifacts[["covariate_concepts"]] <- covariate_concepts_path
-
-
+# Problems are warnings, not stops: a consuming study may simply not be cloned
+# into the workspace yet.
 # -----------------------------------------------------------------------------
-# Chunk 3 - File existence validation
-# -----------------------------------------------------------------------------
-missing_required <- Filter(function(p) !file.exists(p), required_artifacts)
-if (length(missing_required) > 0) {
-  stop(
-    "Missing required phenotype artifact(s):\n",
-    paste0("  [", names(missing_required), "] ", unlist(missing_required), collapse = "\n"),
-    "\nCreate the file(s) or update the sql_file paths in study_params.yaml."
-  )
-}
+cat("=================================================================\n")
+cat("Step 2: what this dataset must support (consumers.yaml)\n")
+cat("=================================================================\n")
+cat("Dataset id : ", consumer_cfg$dataset_id, "\n", sep = "")
 
-missing_optional <- Filter(function(p) !file.exists(p), optional_artifacts)
-if (length(missing_optional) > 0) {
-  warning(
-    "[Step 2] Optional covariate file(s) not found (set path to NULL to suppress):\n",
-    paste0("  [", names(missing_optional), "] ", unlist(missing_optional), collapse = "\n")
-  )
-}
-
-
-# -----------------------------------------------------------------------------
-# Chunk 4 - Load and validate SQL artifacts
-# -----------------------------------------------------------------------------
-load_sql <- function(path, label) {
-  sql <- paste(readLines(path, warn = FALSE), collapse = "\n")
-  if (nchar(trimws(sql)) == 0)
-    stop(label, " SQL file is empty: ", path)
-  # Warn if placeholder concept_id = 0 values are still present.
-  # For parameterized templates this is the YAML-level check; for custom SQL
-  # files this catches any hardcoded 0 values that bypass YAML.
-  if (grepl("concept_id\\s*=\\s*0\\b|IN\\s*\\(\\s*0\\s*\\)", sql)) {
-    warning(
-      "[Step 2] ", label, " (", path, ") may contain placeholder concept_id = 0 values.\n",
-      "  For standard templates: set concept IDs in study_params.yaml.\n",
-      "  For custom SQL files: replace hardcoded 0 values with verified OMOP concept IDs."
-    )
-  }
-  sql
-}
-
-target_cohort_sql   <- load_sql(target_cohort_sql_path, "Target cohort")
-comparator_cohort_sql <- if (comparator_enabled && !is.null(comparator_cohort_sql_path) && file.exists(comparator_cohort_sql_path))
-  load_sql(comparator_cohort_sql_path, "Comparator cohort") else NULL
-outcome_cohort_sql  <- if (!is.null(outcome_cohort_sql_path) && file.exists(outcome_cohort_sql_path))
-  load_sql(outcome_cohort_sql_path, "Outcome cohort") else NULL
-
-
-# -----------------------------------------------------------------------------
-# Chunk 5 - Load and validate covariate definition files (if provided)
-# -----------------------------------------------------------------------------
-covariate_definitions <- NULL
-covariate_concepts    <- NULL
-
-if (!is.null(covariate_definitions_path) && file.exists(covariate_definitions_path)) {
-  covariate_definitions <- read.csv(covariate_definitions_path,
-                                    stringsAsFactors = FALSE, comment.char = "#")
-
-  required_cols <- c("covariate_id", "covariate_name", "domain",
-                     "lookback_start_day", "lookback_end_day", "min_count")
-  if (require_points) required_cols <- c(required_cols, "points")
-  missing_cols  <- setdiff(required_cols, names(covariate_definitions))
-  if (length(missing_cols) > 0)
-    stop("Covariates file is missing required columns: ",
-         paste(missing_cols, collapse = ", "))
-  if (!require_points && !("points" %in% names(covariate_definitions)))
-    message("[Step 2] No 'points' column in covariates — fine unless analyses.integer_risk_score = true.")
-
-  # Warn on placeholder rows (covariate_id still matching template defaults).
-  placeholder_ids <- grep("^covariate_[0-9]+$", covariate_definitions$covariate_id, value = TRUE)
-  if (length(placeholder_ids) > 0)
-    warning(
-      "[Step 2] Covariates file still contains ", length(placeholder_ids),
-      " placeholder row(s): ", paste(placeholder_ids, collapse = ", "), ".\n",
-      "  TODO [COVARIATES]: Replace template example rows with your study covariates."
-    )
-}
-
-if (!is.null(covariate_concepts_path) && file.exists(covariate_concepts_path)) {
-  covariate_concepts <- read.csv(covariate_concepts_path,
-                                 stringsAsFactors = FALSE, comment.char = "#")
-
-  required_cols <- c("covariate_id", "concept_id", "include_descendants")
-  missing_cols  <- setdiff(required_cols, names(covariate_concepts))
-  if (length(missing_cols) > 0)
-    stop("Covariate concepts file is missing required columns: ",
-         paste(missing_cols, collapse = ", "))
-
-  # Cross-check: every concept row must reference a known covariate.
-  if (!is.null(covariate_definitions)) {
-    unknown_ids <- setdiff(unique(covariate_concepts$covariate_id),
-                           unique(covariate_definitions$covariate_id))
-    if (length(unknown_ids) > 0) {
-      # Detect whether template placeholder rows (covariate_1, covariate_2, …) are
-      # still present.  When they are, a mismatch between the two CSVs is expected
-      # and should not halt execution — emit a warning so the analyst can proceed
-      # with setup before Step 8.
-      placeholder_mode <- any(grepl("^covariate_[0-9]+$", covariate_definitions$covariate_id))
-      if (placeholder_mode) {
-        warning(
-          "[Step 2] Covariate concepts file references unknown covariate_id values: ",
-          paste(unknown_ids, collapse = ", "), ".\n",
-          "  Template placeholder rows are still present, so this is reported as a warning.\n",
-          "  Replace template rows in both covariate files before Step 8."
-        )
-      } else {
-        stop("Covariate concepts file references unknown covariate_id values: ",
-             paste(unknown_ids, collapse = ", "))
+if (length(consumer_cfg$consumers) == 0) {
+  warning("[Step 2] consumers.yaml lists no consuming studies, so the Synthea module and the ",
+          "final data are not checked against any study's cohorts. Add each Strategus study ",
+          "that will use this dataset.", call. = FALSE)
+} else {
+  seen <- inspect_consumers(consumer_cfg$consumers, getwd())
+  if (!is.null(seen$manifest)) {
+    for (nm in unique(seen$manifest$consumer)) {
+      m <- seen$manifest[seen$manifest$consumer == nm, , drop = FALSE]
+      cat("\n", nm, ": ", sum(m$role == "target"), " target, ", sum(m$role == "outcome"),
+          " outcome, ", sum(m$role == "covariate"), " covariate cohort(s)", "\n", sep = "")
+      for (i in seq_len(nrow(m))) {
+        cat(sprintf("  %-9s %-9s %s%s\n", m$role[i], m$cohort_id[i], m$cohort_name[i],
+                    if (m$expected_empty[i]) "   (expected empty)" else ""))
       }
     }
   }
-
-  placeholder_concepts <- sum(covariate_concepts$concept_id %in% c(0, "0"), na.rm = TRUE)
-  if (placeholder_concepts > 0)
-    warning(
-      "[Step 2] Covariate concepts file contains ", placeholder_concepts,
-      " placeholder concept_id = 0 value(s).\n",
-      "  TODO [COVARIATES]: Replace with verified standard OMOP concept IDs before Step 8."
-    )
+  for (p in seen$problems) warning("[Step 2] consumer: ", p, call. = FALSE)
+  for (h in seen$hints)    warning("[Step 2] consumer: ", h, call. = FALSE)
 }
 
+cat("\nNext: design the Synthea module, then run workflow/03, which checks that the\n",
+    "module can produce these cohorts before any data is generated.\n", sep = "")
 
 # -----------------------------------------------------------------------------
-# Chunk 6 - Manifest output
-# -----------------------------------------------------------------------------
-cat("=================================================================\n")
-cat("Step 2 complete: phenotype artifacts loaded and validated.\n")
-cat("=================================================================\n")
-cat("Study design     : ", study_design, "\n", sep = "")
-cat("\nCohort artifacts:\n")
-cat("  [target]     ", target_cohort_sql_path,
-    "  (", nchar(target_cohort_sql), " chars)\n", sep = "")
-if (!is.null(comparator_cohort_sql))
-  cat("  [comparator] ", comparator_cohort_sql_path,
-      "  (", nchar(comparator_cohort_sql), " chars)\n", sep = "")
-if (!is.null(outcome_cohort_sql))
-  cat("  [outcome]    ", outcome_cohort_sql_path,
-      "  (", nchar(outcome_cohort_sql), " chars)\n", sep = "")
-cat("\nCovariate definitions:\n")
-if (!is.null(covariate_definitions)) {
-  cat("  covariates   : ", covariate_definitions_path,
-      "  (", nrow(covariate_definitions), " rows)\n", sep = "")
-} else {
-  cat("  covariates   : not provided",
-      if (study_design %in% c("prognostic_model", "causal_inference"))
-        " — define covariates in Step 8 using FeatureExtraction" else "", "\n")
-}
-if (!is.null(covariate_concepts)) {
-  cat("  concepts     : ", covariate_concepts_path,
-      "  (", nrow(covariate_concepts), " rows)\n", sep = "")
-}
-cat("\nStudy parameters:\n")
-cat("  Prediction window  : ",
-    if (!is.null(prediction_window_days)) paste0(prediction_window_days, " days") else "not set",
-    "\n", sep = "")
-cat("  Min prior obs days : ",
-    if (!is.null(min_prior_observation_days)) paste0(min_prior_observation_days, " days") else "not set",
-    "\n", sep = "")
-cat("  Covariate lookback : ",
-    if (!is.null(covariate_lookback_days)) paste0(covariate_lookback_days, " days") else "not set",
-    "\n", sep = "")
-if (!is.null(model_reference)) {
-  cat("\nModel reference (", model_reference$source, "):\n", sep = "")
-  if (!is.null(model_reference$model_type))
-    cat("  Type             : ", model_reference$model_type, "\n", sep = "")
-  if (!is.null(model_reference$score_name) && nzchar(model_reference$score_name %||% ""))
-    cat("  Score / model    : ", model_reference$score_name, "\n", sep = "")
-  if (!is.null(model_reference$source_paper) && nzchar(model_reference$source_paper %||% ""))
-    cat("  Source paper     : ", model_reference$source_paper, "\n", sep = "")
-  if (!is.null(model_reference$time_at_risk_days) && !is.na(model_reference$time_at_risk_days))
-    cat("  Time at risk     : ", model_reference$time_at_risk_days, " days\n", sep = "")
-  if (!is.null(model_reference$original_n) && !is.na(model_reference$original_n))
-    cat("  Original N       : ", model_reference$original_n, "\n", sep = "")
-  if (!is.null(model_reference$original_event_rate) && !is.na(model_reference$original_event_rate))
-    cat("  Original evt rate: ", model_reference$original_event_rate, "\n", sep = "")
-  if (!is.null(model_reference$original_c_statistic) && !is.na(model_reference$original_c_statistic))
-    cat("  C-statistic      : ", model_reference$original_c_statistic, "\n", sep = "")
-  # PLP .rds supplement fields
-  if (!is.null(model_reference$risk_window_end_day))
-    cat("  Risk window      : day ", model_reference$risk_window_start_day %||% 0,
-        " – ", model_reference$risk_window_end_day, "\n", sep = "")
-  if (!is.null(model_reference$total_covariates) && !is.na(model_reference$total_covariates))
-    cat("  Covariates       : ", model_reference$included_covariates, " of ",
-        model_reference$total_covariates, " in model\n", sep = "")
-}
-cat("\nNext step: Rscript workflow/03_generate_synthea_module_artifacts.R\n")
-cat("           (or skip to Step 7 if not using Synthea)\n")
-
-
-# -----------------------------------------------------------------------------
-# Chunk 7 - Study registry
+# Chunk 4 - Study registry
 # Purpose:
 # - Register this study in the workspace-level studies.yaml index on first run.
 # - Subsequent runs are idempotent: already-registered studies are skipped.
@@ -441,7 +156,7 @@ if (!file.exists(registry_path)) {
       "\n  - dir: ", study_dir, "\n",
       "    github: ", github_slug, "\n",
       "    study_name: ", config$study_name, "\n",
-      "    study_design: ", config$study_design, "\n",
+      "    pipeline_role: synth\n",
       "    description: \"\"  # TODO [CONFIG]: add a one-line study description\n",
       "    registered: ", format(Sys.Date(), "%Y-%m-%d"), "\n"
     )

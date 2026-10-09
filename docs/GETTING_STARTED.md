@@ -1,886 +1,360 @@
-# Getting Started: From Zero to Analysis (Complete Workflow)
+# Getting Started: From Zero to a Synthetic Dataset
 
-This guide walks you through the complete workflow from downloading VS Code to creating
-a transportable analysis code packet. Each step is designed to work with any AI coding
-assistant: GitHub Copilot, Claude Code, or any other supported tool.
+This guide takes you from a working charon workspace to a **reusable,
+analysis-specific synthetic OMOP CDM dataset**: author a Synthea module,
+generate patients, load them into OMOP CDM v5.4, quality-check them, and
+register the result so other repos can use it.
 
-This is the canonical procedural guide for this template. The root README is intentionally
-kept concise and links here for full step-by-step execution.
+## What this repo is, and is not
 
-Detailed command snippets are canonicalized in [COMMANDS.md](COMMANDS.md).
-Focused deep dives are split into dedicated docs:
-- GitHub auth details: [GIT_GITHUB_AUTH.md](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/GIT_GITHUB_AUTH.md)
-- Vocabulary load troubleshooting: [TROUBLESHOOTING_VOCAB_LOAD.md](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/TROUBLESHOOTING_VOCAB_LOAD.md)
-- ETL troubleshooting: [TROUBLESHOOTING_ETL.md](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/TROUBLESHOOTING_ETL.md)
+This template is **only** for generating synthetic data. It contains no
+analysis, no report and no deployment bundle:
 
-**Total time:** ~2 hours first time (mostly Docker vocabulary loading)  
-**Repeat-study time:** ~10-20 minutes when your machine is already set up  
-**Requires:** ~35 GB disk space, 8 GB RAM (16 GB recommended), active internet
+| Where | What happens there |
+|---|---|
+| **A `-synth` repo (this template)** | Synthea module → generation → ETL → QC (`workflow/01–06`). Ends at registering the dataset. |
+| A `<study>` analysis-core repo ([`strategus-study-template`](https://github.com/Duke-Vascular-Informatics/strategus-study-template)) | **All of the analysis**: cohorts, analytic strategy, result extraction. |
+| A `<study>-report` repo ([`omop-report-template`](https://github.com/Duke-Vascular-Informatics/omop-report-template)) | The manuscript tables, figures and narrative, from the analysis's aggregate outputs. |
 
-> **Using `charon`?**  
-> The [charon](https://github.com/Duke-Vascular-Informatics/charon) provides SQL Server,
-> the OMOP vocabulary mount, and the dev container as shared infrastructure. If you are working
-> inside that workspace, **skip Steps 4, 6, and 7** (machine setup is already done).
-> Clone your study repo into the workspace folder, then jump to **Step 5** to create the repo
-> and **Step 8** to open the dev container.
+**Why a study needs synthetic data at all.** The analysis is written and
+tested against synthetic patients, so the team can build the cohorts, choose
+the analytic strategy, and produce publication-ready tables and figures
+*before* anyone sees a real result. That keeps the analysis hypothesis-driven
+and limits the opportunity for p-hacking. The finished, reviewed code is then
+run once in the secure environment. So the synthetic data must contain the
+patients, exposures, outcomes and covariates the analysis will need.
 
-This guide prioritizes a post-clone workflow:
-1. Install VS Code
-2. Set up Git and understand version control basics
-3. Install and sign in to your AI coding assistant in VS Code
-4. Create `OMOP_Dev/` and clone the study repo *(skip if using charon)*
-5. Use the AI assistant to help install Docker Desktop and Dev Containers
-6. Check shared setup and continue from there *(skip if using charon)*
+**Who this guide is for.** You know OMOP/OHDSI basics, can read R and Python,
+and know roughly what Java is for. You have read the
+[charon README](https://github.com/Duke-Vascular-Informatics/charon/blob/main/README.md).
 
----
+Related references (these live in the charon workspace, not in this repo):
+- Workspace setup and troubleshooting: [charon `docs/GETTING_STARTED.md`](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/GETTING_STARTED.md), [`docs/SETUP.md`](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/SETUP.md)
+- Vocabulary load problems: [`docs/TROUBLESHOOTING_VOCAB_LOAD.md`](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/TROUBLESHOOTING_VOCAB_LOAD.md)
+- Git/GitHub auth: [`docs/GIT_GITHUB_AUTH.md`](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/GIT_GITHUB_AUTH.md)
+- ETL problems: [`TROUBLESHOOTING_ETL.md`](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/TROUBLESHOOTING_ETL.md)
+- Commands: [COMMANDS.md](COMMANDS.md)
 
-## Step 1: Install VS Code (5 minutes)
-
-### 1.1 Download VS Code
-
-- Go to [code.visualstudio.com](https://code.visualstudio.com)
-- Download and install for your operating system (Windows, macOS, or Linux)
-- Launch VS Code
-
-### 1.2 Verify VS Code installation
-
-```bash
-# In your terminal / command prompt
-code --version          # Should print: X.XX.X
-```
+**Time:** ~2 hours for a first dataset once the workspace exists; the Synthea
+module design is the variable part.
 
 ---
 
-## Step 2: Set Up Git and Version Control (10 minutes)
+## Step 1: Complete the Workspace Setup (one-time per machine)
 
-### 2.1 What version control is (and why you need it)
+A `-synth` repo does not set up its own Docker, SQL Server or vocabulary. It
+lives inside a charon workspace that provides them. If this machine does not
+yet have one, complete **Steps 1–9** of the charon
+[Getting Started guide](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/GETTING_STARTED.md) first. That gives you:
 
-Version control (Git) tracks every meaningful change to your study code.
+- the dev container (R, Java, Python) and the shared SQL Server (`mssql_dev`);
+- the OMOP vocabulary loaded into the `omop_vocab` schema of `omop_synth`;
+- your `.env`, GitHub token, and git identity.
 
-Use it to:
-- Keep a complete history of cohort/covariate/analysis changes
-- Collaborate safely across analysts
-- Reproduce exactly what code produced reported results
-- Roll back mistakes without losing work
+**Match the toolchain to your secure environment before the first build.** The
+container's R, Java and Python versions must match those of the secure
+analytics environment where the analysis will eventually run, because the
+synthetic data is used to develop code for that environment. See
+[charon Step 6.0](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/GETTING_STARTED.md#60-match-the-container-to-your-secure-environment-before-the-first-build).
 
-In this workflow, treat Git commits as study milestones (setup, phenotype definition,
-analysis runs, and bundle generation).
-
-### 2.2 Install Git
-
-- Go to [git-scm.com/downloads](https://git-scm.com/downloads)
-- Install for your operating system
-- On Windows, keep default options unless your organization requires specific settings
-
-### 2.3 Configure your Git identity (one-time)
+Skip this step if the workspace is already set up. You can confirm with:
 
 ```bash
-git config --global user.name "Your Name"
-git config --global user.email "your.email@org.edu"
-```
-
-Optional but recommended default branch preference:
-
-```bash
-git config --global init.defaultBranch main
-```
-
-### 2.4 Verify Git setup
-
-```bash
-git --version
-git config --global --get user.name
-git config --global --get user.email
-```
-
-### 2.5 Link Git to your GitHub account
-
-Choose one authentication method for `git clone`, `git push`, and `git pull`.
-
-- Option A (recommended): SSH keys
-- Option B: HTTPS + token-backed auth (`gh auth login` or your credential manager)
-
-For complete setup and remote switching commands, use:
-[GIT_GITHUB_AUTH.md](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/GIT_GITHUB_AUTH.md)
-
----
-
-## Step 3: Install Your AI Coding Assistant (10 minutes)
-
-### Option A: GitHub Copilot (Free Education Plan)
-
-1. Go to [github.com/features/copilot](https://github.com/features/copilot)
-2. Click **Get Copilot Free** (or **Sign up for free trial**)
-3. Sign in with your GitHub account or create one
-4. Inside VS Code:
-   - Open Extensions (`Ctrl+Shift+X`)
-   - Search for "GitHub Copilot"
-   - Install the official extension by GitHub
-   - Sign in with your GitHub account when prompted
-
-### Option B: Claude Code (Free Trial or Subscription)
-
-1. Go to [claude.ai](https://claude.ai) and sign in or create an account
-2. Click on your profile → "API keys"
-3. Create a new API key and save it securely
-4. Inside VS Code:
-   - Open Extensions (`Ctrl+Shift+X`)
-   - Search for "Claude" (look for Anthropic extension)
-   - Install and configure with your API key
-
-### Option C: Other Coding Assistants
-
-Follow the standard setup for your chosen tool and verify it works in VS Code before
-proceeding to Step 4.
-
----
-
-## Step 4: Create Your Parent Development Folder (5 minutes)
-
-> **Skip this step if using `charon`.** The workspace already provides the shared
-> SQL Server container, vocabulary mount, and `.env` — clone your study repo directly into
-> the workspace folder and proceed to Step 5.
-
-All pieces (SQL Server, OMOP vocabulary, study repositories) live in a single parent folder
-so the relative paths work correctly. Create this **once** and reuse it for every study.
-
-### 4.1 Create the folder
-
-```bash
-# macOS / Linux
-mkdir ~/OMOP_Dev
-cd ~/OMOP_Dev
-
-# Windows (PowerShell)
-New-Item -ItemType Directory -Path $env:USERPROFILE/OMOP_Dev -Force
-cd $env:USERPROFILE/OMOP_Dev
-```
-
-### 4.2 Create the .env file with SQL Server password
-
-The `.env` file stores the SQL Server SA password. Keep it outside the study repo so
-it's never committed to version control.
-
-```bash
-# macOS / Linux
-echo 'MSSQL_SA_PASSWORD=YourStrong@Passw0rd' > .env
-
-# Windows (PowerShell) — use backtick to escape special characters, or paste into editor
-'MSSQL_SA_PASSWORD=YourStrong@Passw0rd' | Out-File -Encoding ascii .env
-```
-
-**Password requirements:**
-- At least 8 characters
-- Mix of upper, lower, digit, and special character (e.g., `@`, `#`, `$`, `%`)
-- Do NOT use `!` (Bash history expansion will fail)
-
-**Example strong passwords:**
-- `SqlServer@2024`
-- `Dev#OMOP$Vocab1`
-- `MyStudy123%Pass`
-
-### 4.3 Verify the folder structure
-
-```bash
-# Should see:
-# .env                   ← your password file (do not commit)
-# (other files added in next steps)
-
-ls -la  # macOS / Linux
-dir     # Windows Command Prompt
+echo $IN_DEV_CONTAINER          # true, when your terminal is inside the container
+echo $MSSQL_HOST                # mssql_dev
 ```
 
 ---
 
-## Step 5: Create Your Study Repository from Template (5 minutes)
+## Step 2: Check Whether a Dataset Already Exists (5 minutes)
 
-This is the recommended next step. Cloning only downloads the files. The thing that must
-wait until Docker and the shared host resources exist is opening the repo in the dev container.
-
-### 5.1 Use the GitHub template
-
-1. Go to [github.com/ohdsi-studies/OMOP-Study-Template](https://github.com/ohdsi-studies/OMOP-Study-Template)
-   *(or your organization's fork of it)*
-2. Click **Use this template** → **Create a new repository**
-3. Name it something descriptive (e.g., `colectomy-ssi-omop`, `hip-replace-vte`)
-4. Choose **Private** (recommended for studies with PHI definitions)
-5. Click **Create repository from template**
-
-### 5.2 Clone inside OMOP_Dev/ (or charon/)
+Generating data takes time. Before creating a repo, check whether the
+workspace's registry already has a dataset that fits (same disease,
+procedure and outcome):
 
 ```bash
-# Standalone: clone into OMOP_Dev/
-cd ~/OMOP_Dev
-
-# OR if using charon:
-cd ~/path/to/charon
-
-# Replace <your-org> and <your-study> with your GitHub paths
-# HTTPS
-git clone https://github.com/<your-org>/<your-study>.git
-
-# OR SSH (if you configured SSH keys in Step 2.5)
-# git clone git@github.com:<your-org>/<your-study>.git
-
-cd <your-study>
+# From the workspace root
+Rscript synthetic_data/scripts/lookup_dataset.R --disease "<clinical term>"
 ```
 
-**Standalone:** The repo MUST be directly inside `OMOP_Dev/`. The relative paths in
-the dev container depend on this structure:
+If one fits, **reuse it instead** (same-machine schema, regenerate from its
+module, or download its clinical tables). See
+[`synthetic_data/README.md`](https://github.com/Duke-Vascular-Informatics/charon/blob/main/synthetic_data/README.md). Only continue
+here if nothing fits.
 
-```
-OMOP_Dev/
-  .env
-  docker-compose.yml
-  omop_vocab/
-  infrastructure/
-    setup/
-      setup_docker_and_vocab.sh
-      setup_docker_and_vocab.ps1
-  <your-study>/          ← your repo is here
-    config.R
-    study_params.yaml
-    ...
-```
+---
 
-**charon:** Clone the study repo directly into the workspace root. The workspace
-already provides `.env`, `docker-compose.yml`, and `omop_vocab/`:
+## Step 3: Create Your Synth Repository from Template (5 minutes)
 
-```
-charon/
-  .env
-  docker-compose.yml
-  omop_vocab/
-  <your-study>/          ← clone here
-    config.R
-    study_params.yaml
-    ...
-```
-
-### 5.3 Install Docker Desktop and Dev Containers (with assistant help)
-
-Now that your AI assistant is active in VS Code, use it to walk through local setup:
-
-1. Install Docker Desktop from [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/)
-2. Start Docker Desktop and wait until it shows as running
-3. In VS Code Extensions, install **Dev Containers** (Microsoft)
-
-> **Apple Silicon (M1/M2/M3):** Docker Desktop runs natively on ARM64. No Rosetta needed.
-
-Verify both tools before continuing:
+1. On GitHub, open this template → **Use this template** → **Create a new
+   repository**.
+2. Name it `<study>-synth`; the `-synth` suffix is the workspace convention for
+   a data-generation-only repo.
+3. Set visibility to **Private**.
+4. In the container terminal, clone it **inside the workspace root** as a
+   sibling of your other study repos, and create your working branch:
 
 ```bash
-docker --version        # Should print: Docker version XX.X.X
-code --version          # Should print: X.XX.X
+cd /workspace
+git clone https://github.com/<your-org>/<study>-synth.git
+cd <study>-synth
+BRANCH=$(gh api user --jq .login)
+git checkout -b "$BRANCH"
+git push -u origin "$BRANCH"
+```
+
+Add the folder to the workspace `.gitignore` and register it in the
+workspace `studies.yaml` (`pipeline_role: synth`). Work only on your own
+branch; changes reach `main` through a pull request.
+
+```
+/workspace/
+├── <study>/            ← analysis-core (strategus-study-template)
+├── <study>-report/     ← report (omop-report-template)
+└── <study>-synth/      ← this repo: data generation only
 ```
 
 ---
 
-## Step 6: Check Whether Shared Local Setup Already Exists (2 minutes)
+## Step 4: Open in the Dev Container and Bootstrap (10 minutes)
 
-> **Skip this step if using `charon`.** The workspace manages SQL Server and the
-> vocabulary mount. Confirm the workspace dev container is running and proceed to Step 8.
-
-Run these checks from `OMOP_Dev/`. If they all pass, skip Step 7 and go directly to Step 8.
-
-### 6.1 Check host-side files and folders
+Work from the container terminal, inside `/workspace/<study>-synth`. Run the
+per-repo bootstrap once. It restores packages, provisions the JDBC driver and
+tests the database connection:
 
 ```bash
-# macOS / Linux
-cd ~/OMOP_Dev
-ls -la .env docker-compose.yml omop_vocab
-ls omop_vocab/CONCEPT.csv
-
-# Windows (PowerShell)
-cd $env:USERPROFILE/OMOP_Dev
-Get-ChildItem .env, docker-compose.yml, omop_vocab
-Get-ChildItem omop_vocab/CONCEPT.csv
+Rscript workflow/01_setup_synthea_etl_qc_env.R
 ```
 
-You should have:
-- `.env`
-- `docker-compose.yml`
-- `omop_vocab/CONCEPT.csv`
-
-### 6.2 Check Docker SQL Server status
-
-```bash
-cd ~/OMOP_Dev  # or $env:USERPROFILE/OMOP_Dev on Windows
-docker compose ps
-```
-
-You should see `mssql_dev` with status `healthy`.
-
-### 6.3 Decide whether to skip
-
-Skip Step 7 if all of the following are true:
-- `.env` exists
-- `docker-compose.yml` exists
-- `omop_vocab/CONCEPT.csv` exists
-- `docker compose ps` shows `mssql_dev` as `healthy`
-
-If any of those checks fail, continue to Step 7.
+If the connection test reports `localhost:1433` refused, see the "Connection
+refused" section of the
+[charon guide](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/GETTING_STARTED.md#connection-refused-on-localhost1433).
 
 ---
 
-## Step 7: Complete Machine Setup If Needed (20-60 minutes)
+## Step 5: Declare the Studies Your Data Must Support (15 minutes)
 
-> **Skip this step if using `charon`.** Machine setup is managed by the workspace.
+A `-synth` repo defines **no cohorts, outcomes or covariates of its own**. What the
+dataset must contain is defined by the studies that will use it, so you declare those
+studies and their own cohort definitions are used directly. Nothing is copied into this
+repo, so nothing can drift out of sync.
 
-Do this only if Step 6 found missing shared setup. This is one-time per machine, not per study.
+In a Strategus study, the target cohort, the outcome cohorts, and every other cohort in
+`inst/Cohorts.csv` (the covariate cohorts) are what the dataset must support. The same
+list drives three checks: `workflow/02` lists the cohorts (this step), `workflow/03` checks
+that the Synthea module can produce them (Step 6), and `workflow/06` checks the final data
+(Step 7).
 
-### Option A: Use the Automated Setup Script (Recommended)
-
-The cloned repository includes a setup script that automates Docker configuration:
+### 5.1 Review what still needs input
 
 ```bash
-# From inside your study repo folder (OMOP_Dev/<your-study>)
-cd ..  # Go to OMOP_Dev/
-
-# macOS / Linux
-bash infrastructure/setup/setup_docker_and_vocab.sh
-
-# Windows (PowerShell)
-powershell -ExecutionPolicy Bypass -File infrastructure\setup\setup_docker_and_vocab.ps1
+Rscript scripts/check_setup.R       # [OK] / [WARN] / [FAIL] per item; no database needed
 ```
 
-This script:
-1. Checks Docker is running
-2. Creates `docker-compose.yml` in `OMOP_Dev/`
-3. Starts the SQL Server container
-4. Creates the `omop_synth` database
-5. Guides you through Athena vocabulary download
+### 5.2 Edit `study_params.yaml`
 
-After the script completes, continue to Step 8.
+Set the study identity (`study_name`), the CDM schema (`cdm_schema`), optionally
+`results_schema` and `output_folder`, and the database description. That file holds
+no cohort, outcome or concept settings. Generation parameters (population size, age
+range, state) are arguments to `workflow/04` in Step 7; record the ones you used in the
+registry entry (Step 8).
 
-### Option B: Manual Docker setup
+### 5.3 List the studies that will use this dataset
 
-If you prefer not to use the script, create `docker-compose.yml` in `OMOP_Dev/`:
-
-**File: `OMOP_Dev/docker-compose.yml`**
+Add every Strategus study that uses this dataset to `consumers.yaml`:
 
 ```yaml
-version: '3.9'
-
-services:
-  mssql:
-    # azure-sql-edge provides native linux/arm64 support for Apple Silicon.
-    # Swap for mcr.microsoft.com/mssql/server:2022-latest on amd64 hardware only.
-    image: mcr.microsoft.com/azure-sql-edge:latest
-    container_name: mssql_dev
-    restart: unless-stopped
-    ports:
-      - "${MSSQL_PORT:-1433}:1433"
-    environment:
-      ACCEPT_EULA: "1"
-      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD}"
-      # Performance tuning for vocabulary load (optional)
-      # MSSQL_MEMORY_LIMIT_MB: "4096"
-    volumes:
-      - mssql_data:/var/opt/mssql
-    healthcheck:
-      test: ["CMD-SHELL", "bash -c 'cat /dev/null > /dev/tcp/localhost/1433' || exit 1"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    networks:
-      - omop_dev_network
-
-volumes:
-  mssql_data:
-    name: mssql_dev_data
-
-networks:
-  omop_dev_network:
-    name: omop_dev_network
+dataset_id: my_study_synth_dataset      # this dataset's id in synthetic_data/registry.yaml
+consumers:
+  - study: my-study-desc                # the study repo, cloned beside this one
+    min_target_subjects: 100            # people required in the target cohort
+    min_outcome_subjects: 10            # outcome people who are also in the target
+    min_covariate_subjects: 1           # people required in each covariate cohort
+    expected_empty: [9100104]           # cohorts the study knows are empty on synthetic data
+not_checked: [some-retired-study]       # in the registry's used_by, deliberately not QC'd
 ```
 
-Then start SQL Server and create the shared database:
-
-```bash
-cd ~/OMOP_Dev  # or $env:USERPROFILE/OMOP_Dev on Windows
-
-# Start SQL Server
-docker compose up -d
-
-# Replace YourStrong@Passw0rd with your actual password from .env
-docker exec mssql_dev \
-  /opt/mssql-tools18/bin/sqlcmd \
-  -S localhost -U SA -P "YourStrong@Passw0rd" -C \
-  -Q "IF DB_ID('omop_synth') IS NULL CREATE DATABASE omop_synth;"
-
-# Verify
-docker compose ps
-```
-
-### 7.1 Download OMOP vocabulary from Athena
-
-The OMOP vocabulary is shared across all studies on this machine.
-
-1. Go to [athena.ohdsi.org](https://athena.ohdsi.org)
-2. Click **Download** → **Create new download**
-3. Select these vocabulary bundles at minimum:
-
-| Vocabulary | Required | Notes |
-|------------|----------|-------|
-| **SNOMED** | ✅ | Primary clinical vocabulary |
-| **RxNorm** | ✅ | Drug ingredients |
-| **RxNorm Extension** | ⭐ | Drugs not in RxNorm |
-| **LOINC** | ✅ | Lab measurements |
-| **ICD10CM** | ✅ | US diagnoses (US studies only) |
-| **CPT4** | ⭐ | US procedures (requires UMLS key) |
-| **HCPCS** | ⭐ | US outpatient procedures |
-| **ICD10PCS** | ⭐ | US inpatient procedures |
-| **Visit** | ✅ | Visit types |
-| **Gender** / **Race** / **Ethnicity** | ✅ | Demographics |
-| **UCUM** | ✅ | Units of measure |
-
-4. Accept the license and click **Download**
-5. Extract it into `OMOP_Dev/omop_vocab/` so `CONCEPT.csv` is directly inside that folder
-
-```bash
-mkdir -p OMOP_Dev/omop_vocab
-unzip ~/Downloads/vocabulary_download_v5*.zip -d OMOP_Dev/omop_vocab/
-ls OMOP_Dev/omop_vocab/CONCEPT.csv
-```
-
-### 7.2 Optional: Rebuild CPT-4 codes
-
-If you did not include CPT-4 in the Athena download, you can skip this step for now.
-
-```bash
-cd OMOP_Dev/omop_vocab
-
-# macOS / Linux
-bash cpt.sh YOUR_UMLS_API_KEY
-
-# Windows (Command Prompt, not PowerShell)
-cpt.bat YOUR_UMLS_API_KEY
-```
-
----
-
-## Step 8: Open in Dev Container (10 minutes)
-
-Now that SQL Server is running, you can safely open the dev container in VS Code.
-
-### 8.1 Open in VS Code
-
-1. Inside VS Code: **File** → **Open Folder**
-2. Navigate to `OMOP_Dev/<your-study>/` and click **Open**
-3. Open the workspace root folder and run the shared root-level dev container.
-4. Continue once the container is running
-   *(Or use `Cmd+Shift+P` → **Dev Containers: Reopen in Container**)*
-
-### 8.2 Wait for container build (5–10 minutes first time)
-
-The first build:
-- Pulls the R + Java image (~1.5 GB)
-- Installs system dependencies
-- Activates renv environment
-
-VS Code shows a progress indicator. When complete, the status bar shows the container name.
-
-### 8.3 Verify the environment
-
-Open a terminal in VS Code (`Ctrl+`` or `Cmd+`` `) and run:
-
-```bash
-# Should print: true
-echo $IN_DEV_CONTAINER
-
-# Should show R 4.5.x
-R --version
-
-# Should show: No errors
-Rscript -e "library(DatabaseConnector); print('OK')"
-```
-
----
-
-## Step 9: Check Whether OMOP Vocabulary Is Already Loaded (2 minutes)
-
-The vocabulary CSV files on disk are not enough by themselves. SQL Server also needs the
-`omop_vocab` schema loaded once per machine.
-
-### 9.1 Check whether the database is already populated
-
-Inside the dev container, run:
-
-```bash
-Rscript -e "
-  config <- get_validation_config()
-  conn <- DatabaseConnector::connect(config$connection_details)
-  result <- tryCatch(
-    DatabaseConnector::querySql(conn, 'SELECT COUNT(*) AS n FROM omop_vocab.concept'),
-    error = function(e) NULL
-  )
-  print(result)
-  DatabaseConnector::disconnect(conn)
-"
-```
-
-If this prints a row count for `omop_vocab.concept`, skip Step 10 and go to Step 11.
-If it errors or returns no table, continue to Step 10.
-
----
-
-## Step 10: Load OMOP Vocabulary into SQL Server (30–60 minutes)
-
-Do this only if Step 9 showed the vocabulary is not already loaded.
-
-### 10.1 Inside the dev container, run the vocabulary loader
-
-```bash
-# Run from the study root (inside the container)
-Rscript infrastructure/scripts/setup_omop_vocab_schema.R --study-dir synthea-omop-template
-```
-
-This script:
-1. Reads the CSV files from `/omop_vocab/` (mounted from `OMOP_Dev/omop_vocab/`)
-2. Creates the `omop_vocab` schema in SQL Server
-3. Loads all 9 vocabulary tables
-4. Creates primary keys and indexes
-
-**Expected output:**
-```
-Loading CONCEPT.csv...
-Loading CONCEPT_ANCESTOR.csv...
-...
-✓ OMOP vocabulary schema loaded successfully
-```
-
-If you see errors, check:
-- SQL Server is running: `docker compose ps` from outside the container
-- `.env` password is correct
-- Files exist: `ls -la /omop_vocab/`
-
-If Step 10 fails or stalls, use the focused runbook:
-[TROUBLESHOOTING_VOCAB_LOAD.md](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/TROUBLESHOOTING_VOCAB_LOAD.md)
-
-### 10.2 Verify vocabulary was loaded
-
-```bash
-# Still inside the container
-Rscript -e "
-  config <- get_validation_config()
-  conn <- DatabaseConnector::connect(config$connection_details)
-  result <- DatabaseConnector::querySql(conn, 'SELECT COUNT(*) FROM omop_vocab.concept')
-  print(result)
-  DatabaseConnector::disconnect(conn)
-"
-
-# Should print: ~2M rows (varies by vocabulary version)
-```
-
----
-
-## Step 11: Define Your Cohort, Outcome, and Covariates (30–60 minutes)
-
-This is where you customize the template for your specific study.
-
-### 11.1 Review the setup checklist
-
-```bash
-# Inside the dev container
-Rscript scripts/check_setup.R
-
-# or in your coding assistant (Claude Code only):
-# /check-setup
-```
-
-This shows what still needs your input.
-
-### 11.2 Edit study_params.yaml
-
-Open `study_params.yaml` and fill in study-specific values:
-
-```yaml
-study_name: "my_study"              # ← Change this
-study_design: "prognostic_model"    # ← Verify / change if different
-
-cdm_schema: "cdm_my_study"          # ← Change to your CDM schema name
-# results_schema, cohort_table, and output_folder default to
-#   <study_name>_results, <study_name>_cohort, output/<study_name>
-# Uncomment and override only if you need non-standard names:
-# results_schema: "my_study_results"
-# cohort_table:   "my_study_cohort"
-
-target:
-  cohort_id: 1
-  index_event:
-    ancestor_concept_ids: [0]       # ← Look these up!
-  inclusion_criteria: []
-  
-outcome:
-  cohort_id: 2
-  ancestor_concept_ids: [0]         # ← Look these up!
-
-prediction_window_days: 30
-
-study_start_date: "2020-01-01"
-study_end_date: "2022-12-31"
-
-output_folder: "output/my_study"    # ← Change this
-
-analyses:
-  cohort_characterization: true     # ← Set to true for analyses you want
-  propensity_score: false
-  ...
-```
-
-### 11.3 Look up concept IDs
-
-For every `[0]` placeholder, use your coding assistant to look up the correct concept ID:
-
-```bash
-# Inside the container
-Rscript scripts/concept_lookup.R "your clinical term" Domain
-
-# Examples:
-Rscript scripts/concept_lookup.R "hip replacement" Procedure
-Rscript scripts/concept_lookup.R "surgical site infection" Condition
-```
-
-**In your coding assistant:** Ask it to help you find and verify concept IDs. It should:
-1. Run the lookup script
-2. Show you the results
-3. Help you document where each ID came from
-
-### 11.4 Edit cohort SQL files
-
-Open the files in `cohorts/`:
-- `target_surgery.sql` — index event cohort definition
-- `outcome_ssi.sql` — outcome cohort definition
-- `comparator_cohort.sql` — (if doing causal inference)
-
-Replace every `concept_id = 0` placeholder with verified concept IDs from Step 11.3.
-
-Example:
-
-```sql
--- BEFORE:
-WHERE c.procedure_concept_id IN (0, 0, 0)  -- TODO: insert procedure concept IDs
-
--- AFTER:
-WHERE c.procedure_concept_id IN (4301351, 4306895)  -- [vocab query] Total hip replacement and variants
-```
-
-### 11.5 Edit covariate files
-
-Update the covariates your study needs:
-
-- `covariates/covariates.csv` — define covariates (rows with `covariate_id`, `covariate_name`, etc.)
-- `covariates/covariate_concepts.csv` — map each covariate to OMOP concept IDs
-
-Example `covariates.csv`:
-```csv
-covariate_id,covariate_name,type
-1,Age,demographic
-2,Male,demographic
-3,Diabetes,condition
-```
-
-Example `covariate_concepts.csv`:
-```csv
-covariate_id,concept_id
-3,201820  # Type 2 diabetes mellitus
-```
-
-### 11.6 Validate your setup
-
-```bash
-Rscript scripts/check_setup.R
-
-# Should show all [OK] or at least no [FAIL] items
-```
-
----
-
-## Step 12: Design Analysis-Specific Synthea Module (Optional, 30 minutes)
-
-If you're using synthetic data (not a real CDM), customize the Synthea module to match
-your study population.
-
-### 12.1 Review the default module
-
-Synthea generates synthetic patient data. The module controls which conditions, procedures,
-and medications are simulated.
-
-```bash
-# Inside the container, see the default module:
-cat synthea/modules/surgical_site_infection_study.json
-```
-
-### 12.2 Customize if needed
-
-For your study population, edit the Synthea module JSON to adjust:
-- Disease prevalence (comorbidities)
-- Procedure rates
-- Medication use patterns
-
-This is optional; the default module is often sufficient for testing.
-
----
-
-## Step 13: Generate Synthetic Data and Run ETL (60 minutes)
-
-### 13.1 Generate Synthea synthetic patient records
-
-```bash
-# Inside the container
-Rscript workflow/01_setup_synthea_etl_qc_env.R    # Install packages, verify DB
-Rscript workflow/03_generate_synthea_module_artifacts.R
-bash workflow/04_generate_synthea_csv.sh          # (Linux/macOS)
-# OR (Windows PowerShell):
-powershell -ExecutionPolicy Bypass -File workflow/04_generate_synthea_csv.ps1
-```
-
-This creates synthetic EHR data in CSV format.
-
-### 13.2 Run ETL (Extract, Transform, Load)
-
-```bash
-# Load the CSV files into the CDM schema
-Rscript workflow/05_etl_csv_to_omop.R
-```
-
-This:
-1. Reads Synthea CSV files
-2. Transforms to OMOP v5.4 format
-3. Loads into `config$cdm_schema` in SQL Server
-
-### 13.3 Run data quality checks
-
-```bash
-Rscript workflow/06_quality_check_defined_phenotypes.R
-```
-
-If Step 13 fails, use the focused runbook:
-[TROUBLESHOOTING_ETL.md](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/TROUBLESHOOTING_ETL.md)
-
----
-
-## Step 14: Create and Test Analysis Code (30–60 minutes)
-
-### 14.1 Build cohorts
+**If a study's analysis depends on discharge disposition** (for example a non-home discharge
+outcome), also set `discharge_disposition_check: true` on it. Such a cohort is hand-authored SQL that
+Strategus never runs, so the cohort check cannot see whether the dataset carries dispositions at
+all. This opt-in check reads `visit_occurrence` and verifies discharge dispositions were loaded,
+mapped to concepts, and include both home (NUBC 01) and non-home discharge. `workflow/02` and
+`check_setup` warn when a consumer's own cohort SQL reads `discharged_to_*` but the check is not
+set. Optional thresholds: `min_discharge_visits`, `min_non_home_visits`, `min_discharge_mapped_pct`.
+
+The target and outcome ids are read from `CreateStrategusAnalysisSpecification.R` (or set
+`target_id` / `outcome_ids` yourself; the script cannot read ids a spec builds
+programmatically, and says so). Mark outcomes that Synthea cannot generate as
+`expected_empty` so they are reported rather than failed. Each study must also appear in
+the registry's `used_by` for this dataset (Step 8); QC warns if they disagree. The
+producer repo itself is ignored, and studies you list under `not_checked` (retired, or not
+a Strategus repo) are too.
+
+The consuming study's cohorts must exist before they can be checked: if the study is still
+being designed, define its cohorts in **its** repo first. The dataset follows the study's
+definitions, not the other way round.
+
+### 5.4 See what the module must cover
 
 ```bash
 Rscript workflow/02_define_omop_cohort_outcome_covariates.R
 ```
 
-This:
-1. Validates your SQL cohort definitions
-2. Instantiates target, outcome, and comparator cohorts in SQL Server
-3. Checks that the cohorts are non-empty and reasonable
+It prints, for each consuming study, its target, outcome and covariate cohorts, and warns
+about anything that would stop the later checks (a study repo not cloned, a missing
+manifest or cohort JSON, an unresolvable target or outcome id). No database is needed.
 
-### 14.2 Run analyses
+### 5.5 Concept IDs
 
-```bash
-Rscript workflow/07_setup_analysis_env.R       # Install analysis packages
-Rscript workflow/08_run_analysis_and_manuscript_report.R
-```
-
-All analysis parameters are controlled by the `analyses:` flags in `study_params.yaml`.
-No code editing needed — just set flags to `true` / `false`.
-
-### 14.3 Review outputs
-
-Outputs are written to `config$output_folder` (e.g., `output/my_study/`):
-
-```bash
-# Inside the container
-ls -la output/my_study/
-
-# View results in VS Code or your file explorer
-# e.g., output/my_study/CharacterizationResults.csv
-```
+This repo contains no concept IDs. A concept a consuming cohort needs is added to that
+study's own cohort definition, following Rule 1 (check the OHDSI Phenotype Library, your
+lab's ATLAS definitions, the local catalog, then a live vocabulary query; tag each ID
+`[vocab query]`). The live query is
+`Rscript scripts/concept_lookup.R "<clinical term>" <Domain>`. In the Synthea module you
+use source codes (SNOMED-CT, RxNorm, LOINC) that map to those concepts; Step 6 checks that
+they do.
 
 ---
 
-## Step 15: Create Transportable Code Packet (5 minutes)
+## Step 6: Design the Analysis-Specific Synthea Module (30 minutes)
 
-Your analysis code is now ready to run in any environment (with SQL Server access).
+Synthea simulates patients from **modules**: JSON state machines that decide
+which conditions, procedures and medications each patient gets. This step
+shapes the dataset to the analysis.
 
-### 15.1 Generate the transportable bundle
+1. Open the default module in `synthea/modules/` (for example
+   `surgical_site_infection_study.json`) to see the structure.
+2. Edit it so the population contains what the studies in Step 5 require: the
+   index event, the outcomes at plausible rates, and the comorbidities and
+   exposures used as covariates (prevalence, procedure rates, medication
+   patterns). Step 5.4 lists the cohorts to cover.
+3. Validate it, regenerate its diagram, and check coverage:
 
 ```bash
-# Inside the container
-bash workflow/09_build_portable_analysis_bundle.sh
-# OR (Windows PowerShell):
-powershell -ExecutionPolicy Bypass -File workflow/09_build_portable_analysis_bundle.ps1
+Rscript workflow/03_generate_synthea_module_artifacts.R
+Rscript workflow/03_generate_synthea_module_artifacts.R --enforce_coverage=true   # stop if a study's cohort cannot be produced
 ```
 
-This creates a self-contained folder `portable/transportable_bundle/` containing:
-- All analysis R code
-- Pinned R packages (`renv.lock`)
-- JDBC driver (bundled)
-- OHDSI packages (prebuilt binaries)
-- Configuration templates
+**Coverage check.** Workflow 03 also runs `scripts/module_coverage_check.R`, before you
+spend time generating data. For every study in `consumers.yaml` it reads the study's cohort
+definitions and checks that the Synthea modules that will run can emit the concepts they need:
+the entry-event concept sets, plus any inclusion criterion that requires an event. It
+considers your custom module **and** Synthea's built-in modules, because workflow 04 runs
+them all (without an `-m` flag), so common comorbidities are often supplied by the built-ins.
+The module's codes are mapped to standard OMOP concepts through the loaded vocabulary and
+matched with `concept_ancestor`, so a concept set that includes descendants is matched by
+its child concepts. Each cohort is reported `COVERED` (with whether the custom module,
+the built-ins, or both supply it), `NOT_COVERED`, `NOT_EVALUABLE` (an entry criterion has no
+concept set) or `EXPECTED_EMPTY` (listed in `expected_empty`). Results go to
+`output/qc/module_coverage.csv`.
 
-### 15.2 Share the packet
+`COVERED` means the module **can** emit the concept; age, sex, probabilities and the ETL can
+still make it rare or empty, so the final counts are judged by consumer-study QC in Step 7.
+Two things are deliberately not judged. Visit entry events (for example "Inpatient Visit"): Synthea never
+emits a visit concept through a code, the ETL derives it from the encounter class, so the cohort is judged on
+its other required criteria, and a cohort that is *only* a visit criterion (such as a discharge-disposition
+outcome) is `NOT_EVALUABLE`. For those, use `discharge_disposition_check` (Step 5.3) and consumer QC on the
+final data. Inclusion criteria are judged when they are "at least one" criteria in an ALL group, or an ANY
+group made only of such criteria (satisfied by any one of its concept sets).
+On a real dataset this check named exactly the three outcomes that later had no people.
+It needs the vocabulary (a database connection); skip it with `--skip_coverage_check=true`.
 
-The `transportable_bundle/` can be:
-1. **Shipped to a data partner** — they extract it, update config with their schema names, and run `Rscript run_analysis.R` locally
-2. **Pushed to GitHub** — other researchers can clone and use it
-3. **Archived** — long-term preservation of exact analysis code and package versions
+Realism matters for testing the pipeline (event rates, timing, coding), but
+remember the data is synthetic: it shows that the analysis plan works, not
+what the real effect will be.
+
+---
+
+## Step 7: Generate Synthetic Data, Run ETL, and Check Quality (60 minutes)
+
+```bash
+bash workflow/04_generate_synthea_csv.sh           # Synthea (Java) writes synthetic patient CSVs
+Rscript workflow/05_etl_csv_to_omop.R              # CSV -> OMOP CDM v5.4 in config$cdm_schema
+Rscript workflow/06_quality_check_defined_phenotypes.R   # data quality + phenotype validation
+```
+
+On Windows run
+`powershell -ExecutionPolicy Bypass -File workflow/04_generate_synthea_csv.ps1`
+for the first command. Never run `.sh`/`.ps1` files with `Rscript`.
+
+The ETL links to the shared `omop_vocab` schema rather than reloading it. The
+generic QC checks the dataset in general: people, visits, procedures and conditions,
+the share of conditions mapped to standard concepts, the era tables and age
+distribution (thresholds and flags are in `workflow/README.md`; pass
+`--enforce_thresholds=true` to make a shortfall fail the step). It holds no study
+concepts; what a study needs is checked by the consumer-study QC below.
+
+**Consumer-study QC.** After the generic checks, workflow 06 also runs
+`scripts/consumer_cohort_qc.R`: for every study in `consumers.yaml` it renders that
+study's cohorts from their circe JSON (as Strategus does), instantiates them against
+the synthetic CDM, and reports subjects per cohort and, for outcomes, subjects who are
+also in the target. A cohort below its minimum is a FAIL. Output goes to
+`output/qc/consumer_cohort_qc.csv`.
+
+```bash
+Rscript workflow/06_quality_check_defined_phenotypes.R --enforce_thresholds=true
+# or only the consumer check:
+Rscript scripts/consumer_cohort_qc.R --enforce_thresholds=true
+```
+
+Run it with `--enforce_thresholds=true` before you regenerate or change a dataset that
+other studies already use, so you do not break their links. It checks that the cohorts are
+populated at the subject level; it does not re-run time-at-risk windows. Skip it with
+`--skip_consumer_qc=true`. If a step fails, use the
+[ETL troubleshooting guide](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/TROUBLESHOOTING_ETL.md).
+
+---
+
+## Step 8: Register Your Synthetic Dataset (10 minutes)
+
+The dataset is generated, loaded and checked. This repo's job ends here.
+
+1. Add an entry to `synthetic_data/registry.yaml` in the workspace
+   root: the disease/procedure covered, the outcomes present, `source_repo`
+   (this repo), `producer_role: synth`, and the schema name. The file's header
+   comment lists every field. List every consuming study under `used_by`; it
+   must match `consumers.yaml` (and `consumes_dataset` in the workspace
+   `studies.yaml`). **Never** include vocabulary tables in anything you export
+   or share.
+2. Commit this repo's changes on your branch and open a PR into `main`:
+
+```bash
+git add synthea/modules/ study_params.yaml consumers.yaml
+git commit -m "feat: synthetic dataset for <disease/procedure/outcome>"
+git push
+```
+
+Your analysis-core repo can now point at the registered dataset (see
+[`synthetic_data/README.md`](https://github.com/Duke-Vascular-Informatics/charon/blob/main/synthetic_data/README.md)). Analysis and the
+manuscript happen there and in the report repo.
 
 ---
 
 ## Troubleshooting
 
-Use focused troubleshooting docs to reduce duplicated guidance and merge conflicts:
-
-- Infrastructure and container setup: [SETUP.md](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/SETUP.md)
-- Vocabulary loading failures: [TROUBLESHOOTING_VOCAB_LOAD.md](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/TROUBLESHOOTING_VOCAB_LOAD.md)
-- Synthetic generation and ETL failures: [TROUBLESHOOTING_ETL.md](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/TROUBLESHOOTING_ETL.md)
-- Concept lookup workflow and verification: [charon's CLAUDE.md](https://github.com/Duke-Vascular-Informatics/charon/blob/main/CLAUDE.md)
-
----
-
-## Next Steps
-
-1. **Commit your study definition** to version control:
-   ```bash
-   git add study_params.yaml cohorts/ covariates/
-   git commit -m "feat: Define <your study name> cohort, outcome, and covariates"
-   git push
-   ```
-
-2. **Share your analysis** — push the transportable bundle or the study repo itself
-
-3. **Document your phenotypes** — add README files explaining clinical rationale for each cohort
-
----
+- Workspace, container, Docker, vocabulary: the charon guides linked above
+- Synthea generation and ETL: [charon `TROUBLESHOOTING_ETL.md`](https://github.com/Duke-Vascular-Informatics/charon/blob/main/docs/TROUBLESHOOTING_ETL.md)
+- Concept lookup and coding rules: [CLAUDE.md](../CLAUDE.md)
 
 ## Getting Help
 
-- **OHDSI Community** — [forums.ohdsi.org](https://forums.ohdsi.org)
-- **Book of OHDSI** — [ohdsi.github.io/TheBookOfOhdsi](https://ohdsi.github.io/TheBookOfOhdsi)
-- **Your coding assistant** — ask it to explain any of these steps or help debug errors
-
----
+- **OHDSI Community**: [forums.ohdsi.org](https://forums.ohdsi.org)
+- **Book of OHDSI**: [ohdsi.github.io/TheBookOfOhdsi](https://ohdsi.github.io/TheBookOfOhdsi)
+- **Your coding assistant**: ask it to explain any step or help debug errors
 
 ## Key Files to Know
 
 | File | Purpose |
-|------|---------|
+|---|---|
 | `config.R` | Infrastructure settings (do not edit) |
-| `study_params.yaml` | Your study's settings (edit this) |
-| `cohorts/*.sql` | Cohort definitions (edit these) |
-| `covariates/*.csv` | Covariate definitions (edit these) |
-| `workflow/01–09` | Analysis pipeline (do not edit) |
-| Workspace root container config | Shared development environment (do not edit from this study repo) |
-| `output/` | Analysis results (gitignored) |
-| `portable/` | Transportable bundle (for sharing) |
-
----
+| `study_params.yaml` | Identity, schemas, database description (edit) |
+| `synthea/modules/*.json` | The Synthea disease/procedure module (edit; the main work) |
+| `consumers.yaml` | The Strategus studies that use this dataset; QC checks their cohorts (edit) |
+| `workflow/01–06` | The generation pipeline (do not edit) |
+| `output/` | Generation logs and QC output (gitignored) |
 
 ## Version Info
 
-- **R version:** 4.5.x
-- **Java:** 17 (Eclipse Adoptium)
+- **R / Java / Python:** the versions chosen for your workspace to match your secure analytics environment (charon `.env`: `R_VERSION`, `JAVA_VERSION`, `PYTHON_VERSION`)
 - **SQL Server:** Azure SQL Edge (ARM64) or SQL Server 2022 (AMD64)
-- **OHDSI packages:** Latest from [github.com/OHDSI](https://github.com/OHDSI)
 - **OMOP CDM:** v5.4

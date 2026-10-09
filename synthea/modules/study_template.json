@@ -20,13 +20,13 @@
     "3. Search for every RESEARCHER_ADJUSTS token and tune the numeric value",
     "   (prevalence, timing range, oversampling proportion) using literature or",
     "   institutional data for your target population.",
-    "4. Align the four Covariate_N states with covariates/covariate_concepts.csv:",
-    "   - Set each Covariate_N_Onset code to match concept_id in that file.",
+    "4. Align the Covariate_N states with the covariate cohorts of the studies in consumers.yaml:",
+    "   - Set each Covariate_N_Onset code to a concept in that covariate cohort's concept set (workflow/03 checks coverage).",
     "   - Set each Covariate_N_Check prevalence from your literature review.",
     "   - Change state type if domain is procedure (Procedure) or drug (MedicationOrder).",
     "5. Set Outcome_Assessment distribution to expected outcome incidence.",
     "6. Run workflow/03_generate_synthea_module_artifacts.R to regenerate the",
-    "   visual state diagram and validate structural integrity.",
+    "   visual state diagram and validate structural integrity; it also checks the module can produce the cohorts of the studies in consumers.yaml.",
     "7. Run workflow/04_generate_synthea_csv.sh to generate synthetic CSV data.",
     "",
     "OVERSAMPLING RATIONALE",
@@ -47,11 +47,11 @@
     "-------------------------",
     "Phase 1  Eligibility       Age guard and onset delay",
     "Phase 2  Diagnosis         Exposure condition onset + outpatient encounter",
-    "Phase 3  Covariates        Four comorbidity states (maps to covariate_concepts.csv)",
+    "Phase 3  Covariates        Four comorbidity states (cover the consuming studies' covariate cohorts)",
     "Phase 4  Treatment         Oversampling branch (non-exposed vs. target-exposed)",
     "Phase 5  Pre-index delay   Time from diagnosis to procedure",
     "Phase 6  Index procedure   Inpatient encounter + procedure",
-    "Phase 7  Observation       Post-discharge window (maps to prediction_window_days)",
+    "Phase 7  Observation       Post-discharge window (match the consuming studies' time at risk)",
     "Phase 8  Outcome gate      Fixed-incidence branch (RESEARCHER_ADJUSTS)",
     "Phase 9  Outcome pathway   Outcome onset, encounter, management, resolution"
   ],
@@ -143,7 +143,7 @@
         "",
         "REPLACE_ME: Replace the code after running a vocabulary lookup.",
         "  Step 1 — identify the condition from:",
-        "    study_params.yaml > target > index_event (when domain = 'condition')",
+        "    the target cohort of a study in consumers.yaml (when its entry event is a condition)",
         "    or your study's phenotype definition document.",
         "  Step 2 — run the lookup:",
         "    Rscript scripts/concept_lookup.R '<condition name>' Condition",
@@ -199,14 +199,14 @@
         "RESEARCHER_ADJUSTS: Set distribution 0 to the prevalence of covariate_1",
         "in your target population. Default: 0.30 (30%).",
         "",
-        "Covariate_1 corresponds to the first row in covariates/covariate_concepts.csv",
-        "(domain = 'condition', lookback -365 to -1 days in covariates/covariates.csv).",
-        "The concept code used in Covariate_1_Onset must match the concept_id in",
-        "covariate_concepts.csv after your [vocab query].",
+        "Covariate_1 corresponds to a covariate cohort of a study in consumers.yaml",
+        "(a condition; workflow/02 lists the covariate cohorts to cover).",
+        "The concept code used in Covariate_1_Onset must map to a concept in or below",
+        "that cohort's concept set after your [vocab query]; workflow/03 checks this.",
         "",
         "To add more covariate states: duplicate the Covariate_N_Check + Covariate_N_Onset",
         "pair, assign sequential names, and chain them before Treatment_Strategy.",
-        "Add corresponding rows to covariates.csv and covariate_concepts.csv."
+        "Add a covariate state only if a consuming study has a matching covariate cohort."
       ],
       "distributed_transition": [
         {
@@ -224,10 +224,10 @@
       "type": "ConditionOnset",
       "remarks": [
         "REPLACE_ME: Condition representing covariate_1 (domain = 'condition').",
-        "  Step 1 — identify from covariates/covariates.csv row covariate_1.",
+        "  Step 1 — identify from a covariate cohort of a study in consumers.yaml.",
         "  Step 2 — run: Rscript scripts/concept_lookup.R '<covariate name>' Condition",
         "  Step 3 — replace REPLACE_ME with the verified SNOMED-CT source code.",
-        "  Step 4 — enter that standard concept_id in covariate_concepts.csv row covariate_1.",
+        "  Step 4 — confirm the concept is in that cohort's concept set (workflow/03 checks it).",
         "  Step 5 — tag [vocab query] here and in the CSV file."
       ],
       "codes": [
@@ -246,8 +246,8 @@
         "RESEARCHER_ADJUSTS: Set distribution 0 to the prevalence of covariate_2.",
         "Default: 0.30 (30%).",
         "",
-        "Covariate_2 corresponds to row covariate_2 in covariate_concepts.csv",
-        "(domain = 'procedure', lookback -30 to 0 days in covariates.csv).",
+        "Covariate_2 corresponds to a covariate cohort of a study in consumers.yaml",
+        "(a procedure; workflow/02 lists the covariate cohorts to cover).",
         "Because the domain is 'procedure', consider changing Covariate_2_Onset",
         "state type to 'Procedure' and adding a duration field."
       ],
@@ -267,11 +267,11 @@
       "type": "ConditionOnset",
       "remarks": [
         "REPLACE_ME: Condition (or procedure) representing covariate_2.",
-        "Domain in covariates.csv is 'procedure' — if modelling a prior procedure,",
+        "If the consuming covariate cohort is a procedure — if modelling a prior procedure,",
         "change this state type to 'Procedure' and add a duration field:",
         "  'duration': { 'low': 30, 'high': 120, 'unit': 'minutes' }",
         "  Run: Rscript scripts/concept_lookup.R '<procedure name>' Procedure",
-        "Enter the standard concept_id in covariate_concepts.csv row covariate_2."
+        "Confirm the concept is in the consuming cohort's concept set (workflow/03 checks it)."
       ],
       "codes": [
         {
@@ -289,8 +289,8 @@
         "RESEARCHER_ADJUSTS: Set distribution 0 to the prevalence of covariate_3.",
         "Default: 0.30 (30%).",
         "",
-        "Covariate_3 corresponds to row covariate_3 in covariate_concepts.csv",
-        "(domain = 'drug', lookback -90 to 0 days in covariates.csv).",
+        "Covariate_3 corresponds to a covariate cohort of a study in consumers.yaml",
+        "(a drug; workflow/02 lists the covariate cohorts to cover).",
         "Because the domain is 'drug', change Covariate_3_Onset state type to",
         "'MedicationOrder', system to 'RxNorm', and add a dosage/duration:",
         "  'dosage': { 'amount': 1, 'frequency': 1, 'period': 1, 'unit': 'days' },",
@@ -314,7 +314,7 @@
         "REPLACE_ME: Drug exposure representing covariate_3 (domain = 'drug').",
         "Change state type to 'MedicationOrder' and system to 'RxNorm':",
         "  Run: Rscript scripts/concept_lookup.R '<drug name>' Drug",
-        "Enter the standard concept_id in covariate_concepts.csv row covariate_3.",
+        "Confirm the concept is in the consuming cohort's concept set (workflow/03 checks it).",
         "MedicationOrder requires a paired MedicationEnd state after the delay."
       ],
       "codes": [
@@ -333,10 +333,10 @@
         "RESEARCHER_ADJUSTS: Set distribution 0 to the prevalence of covariate_4.",
         "Default: 0.30 (30%).",
         "",
-        "Covariate_4 appears in covariate_concepts.csv but does NOT yet have a",
-        "matching row in covariates/covariates.csv. Add a row to covariates.csv",
-        "with covariate_id = 'covariate_4' before running FeatureExtraction.",
-        "See covariates/README.md for required column definitions."
+        "Covariate_4 is a spare covariate state: use it only if a consuming study has",
+        "a matching covariate cohort; otherwise delete the state. Name the cohort in",
+        "the study's inst/Cohorts.csv so workflow/02 lists it.",
+        "Set the state type to match the cohort's domain."
       ],
       "distributed_transition": [
         {
@@ -355,8 +355,8 @@
       "remarks": [
         "REPLACE_ME: Condition representing covariate_4.",
         "  Run: Rscript scripts/concept_lookup.R '<covariate name>' <Domain>",
-        "Enter the standard concept_id in covariate_concepts.csv row covariate_4.",
-        "Add a row to covariates/covariates.csv for covariate_4 before use.",
+        "Confirm the concept is in the consuming cohort's concept set (workflow/03 checks it).",
+        "Delete this state if no consuming study has a matching cohort.",
         "Change system to 'LOINC' if domain is measurement or observation."
       ],
       "codes": [
@@ -456,9 +456,9 @@
       "type": "Encounter",
       "remarks": [
         "Encounter for the index procedure. The encounter class and code must",
-        "match the visit type used in the target cohort SQL.",
-        "See study_params.yaml > target > visit_concept_ids for the OMOP visit",
-        "concept IDs that the SQL filters on.",
+        "match the visit type used by the target cohort of the consuming studies.",
+        "Check the target cohort's visit criteria in each study listed in",
+        "consumers.yaml (workflow/02 lists the cohorts).",
         "",
         "REPLACE_ME: Replace the encounter code for your admission type.",
         "  Run: Rscript scripts/concept_lookup.R 'hospital admission' Visit",
@@ -485,9 +485,9 @@
       "type": "Procedure",
       "remarks": [
         "The index procedure or intervention defining target cohort membership.",
-        "This concept must match the ancestor_concept_ids in:",
-        "  study_params.yaml > target > index_event (when domain = 'procedure')",
-        "and the concept IDs used in cohorts/target_surgery.sql.",
+        "This concept must map to a concept in or below the entry-event concept set of the",
+        "  target cohort of every study in consumers.yaml (when the entry event is a procedure)",
+        "(workflow/03 checks this before data is generated).",
         "",
         "REPLACE_ME: Replace code after vocabulary lookup.",
         "  Run: Rscript scripts/concept_lookup.R '<procedure name>' Procedure",
@@ -550,7 +550,7 @@
       "type": "Delay",
       "remarks": [
         "Observation window from discharge to outcome assessment.",
-        "Set to span prediction_window_days from study_params.yaml minus the",
+        "Set to span the consuming studies' time at risk minus the",
         "expected post-procedure inpatient stay duration.",
         "",
         "RESEARCHER_ADJUSTS: Set low and high (in days).",
@@ -613,9 +613,9 @@
     "Outcome_Onset": {
       "type": "ConditionOnset",
       "remarks": [
-        "The study outcome event. This concept must match the ancestor_concept_ids in:",
-        "  study_params.yaml > outcome > ancestor_concept_ids",
-        "and the concept IDs used in cohorts/outcome_ssi.sql (or equivalent).",
+        "The study outcome event. This concept must map to a concept in or below the",
+        "  concept set of an outcome cohort of a study in consumers.yaml",
+        "(workflow/03 checks this before data is generated).",
         "",
         "REPLACE_ME: Replace code after vocabulary lookup.",
         "  Run: Rscript scripts/concept_lookup.R '<outcome name>' Condition",

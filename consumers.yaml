@@ -1,0 +1,43 @@
+# =============================================================================
+# consumers.yaml — the Strategus studies that use this synthetic dataset
+#
+# Tracks which downstream studies depend on the dataset this -synth repo
+# generates. It is the dataset's specification, used at three points so that
+# regenerating or editing the dataset cannot silently break a study:
+#   workflow/02  lists each listed study's cohorts (what must be covered)
+#   workflow/03  scripts/module_coverage_check.R checks the Synthea module (custom
+#                + built-in modules) CAN produce them, before generation
+#   workflow/06  scripts/consumer_cohort_qc.R instantiates them against the final
+#                synthetic CDM and fails any that is empty or too small
+#
+# Field reference (and the generic template of this file):
+#   https://github.com/Duke-Vascular-Informatics/synthea-omop-template/blob/main/consumers.yaml
+#
+# Keep this file in step with `used_by` for dataset `pad_amp` in the workspace
+# synthetic_data/registry.yaml (and `consumes_dataset` in studies.yaml). QC warns when
+# they disagree. The producer repo itself is ignored automatically.
+#
+# Run the QC against dataset v2 with --cdm_schema=omop_synth_pad_amp_v2.
+# =============================================================================
+
+dataset_id: pad_amp
+
+# Registry consumers deliberately not checked here.
+not_checked:
+  - pad-bka-aka-prog   # flat-template repo: cohorts are cohorts/*.sql, with no inst/Cohorts.csv for the QC to read
+
+consumers:
+  - study: pad-amp-ed-desc
+    # target 1797941 and outcomes 1797944-6 are read from its CreateStrategusAnalysisSpecification.R
+
+  - study: pad-amp-nhd-prog
+    target_id: 9100011          # spec builds outcomeIds programmatically, so state the ids
+    outcome_ids: [9100001]      # non-home discharge
+    discharge_disposition_check: true   # that outcome is hand-authored SQL on discharged_to_*
+
+  - study: pad-amp-nhd-val
+    target_id: 9100011
+    outcome_ids: [9100001]
+    discharge_disposition_check: true
+    expected_empty: [9100026]   # Dependent Functional Status (ADL dependence): not in the pad_amp_dispo module
+                                # or any built-in Synthea module, so 0 people. TODO: add it to the module.

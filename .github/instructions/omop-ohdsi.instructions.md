@@ -72,19 +72,14 @@ Rules:
 - Join via `concept_ancestor` when descendant expansion is needed (e.g., all subtypes of a drug class).
 - Confirm `invalid_reason IS NULL` before committing any concept ID.
 
-## Cohort Table Convention
+## Cohorts
 
-Cohorts follow the standard OHDSI structure in `config$cohort_table`:
-
-```sql
-cohort_definition_id  BIGINT  -- matches config$target_cohort_id / outcome_cohort_id etc.
-subject_id            BIGINT  -- maps to person_id in the CDM
-cohort_start_date     DATE    -- index date (first qualifying event)
-cohort_end_date       DATE    -- observation end or censoring date
-```
-
-- IDs are defined in `config.R` — never hardcode `cohort_definition_id = 1` in analysis code.
-- Use `build_cohorts()` from `R/cohorts.R` to populate the cohort table from SQL files.
+A `-synth` repo defines and instantiates no cohorts of its own. The cohorts that matter are
+those of the Strategus studies listed in `consumers.yaml`: `workflow/02` lists them,
+`workflow/03` checks the Synthea module can produce them, and `workflow/06` instantiates them
+into scratch tables (`qc_consumer_*`, dropped afterwards) to count people. Cohorts follow the
+standard OHDSI structure (`cohort_definition_id`, `subject_id`, `cohort_start_date`,
+`cohort_end_date`); never hardcode `cohort_definition_id` values here.
 
 ## Concept ID Lookup — MANDATORY RULE
 

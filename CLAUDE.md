@@ -12,15 +12,14 @@ Use the workspace-level file as canonical guidance for Claude Code and other ass
 synthetic OMOP CDM (patients undergoing major lower extremity amputation for
 dysvascular / diabetic / wound indications, with a modeled 90-day post-discharge
 ED-visit outcome and a VA-Frailty-Index comorbidity burden) for the `pad-amp-ed-desc`
-Strategus pipeline (and, via a view-overlay, `pad-oler-aki-desc`). It has no IRB scope,
+Strategus pipeline and the other studies listed in `consumers.yaml`. It has no IRB scope,
 no real patient data, and no OSF protocol.
 
 ### Scope: Steps 1-6 only
 
-Run **Steps 1-6 only** (module authoring, Synthea generation, ETL, QC). Steps 7-8
-(`workflow/07`/`08`, analysis + Word report) are **never** used — every flag under
-`analyses:` in `study_params.yaml` stays `false`. The analysis/report R code carried in
-`R/` is dormant template leftovers; do not run it here.
+Run **Steps 1-6 only** (module authoring, Synthea generation, ETL, QC). There is no analysis,
+report or bundle code in this repo (the old `workflow/07`/`08` and the analysis R code were removed);
+analysis lives in the consuming study repos.
 
 ### The Synthea module
 
@@ -28,22 +27,29 @@ Run **Steps 1-6 only** (module authoring, Synthea generation, ETL, QC). Steps 7-
   amputation → 90-day post-discharge ED-visit pathway, ~30 VA-FI comorbidity states,
   and a fixed ED-visit probability gate). `study_template.json` is the generic stub and
   is auto-skipped by Steps 3/4.
-- The authoritative cohort, outcome, and covariate **definitions** live in the analysis
-  repo `pad-amp-ed-desc/` (`inst/` cohorts + `covariates/`). This repo's `cohorts/*.sql`
-  are kept only for Step 6 QC phenotype sanity checks; `covariates/*.csv` are emptied to
-  headers on purpose.
+- This repo defines **no cohorts, outcomes or covariates of its own** (the local `cohorts/` and
+  `covariates/` were removed). What the dataset must contain is defined by the studies listed in
+  `consumers.yaml`, whose own cohort definitions (`inst/Cohorts.csv`, `inst/cohorts/*.json`) are read
+  directly: `workflow/02` lists them, `workflow/03` checks the Synthea module (custom + built-in) can
+  produce them before generation (`--enforce_coverage=true` to stop on a gap), and `workflow/06` checks
+  the final data (`--enforce_thresholds=true`). Declare cohorts a consumer knows are empty on synthetic
+  data under `expected_empty`; set `discharge_disposition_check: true` for a consumer whose analysis
+  depends on discharge disposition. Keep `consumers.yaml` in step with `used_by` in the registry.
+- The QC scripts default to the schema in `study_params.yaml` (`omop_synth_pad_amp_dispo`); for dataset
+  v2 pass `--cdm_schema=omop_synth_pad_amp_v2`.
 
 ### Schema naming (important)
 
 `cdm_schema` is pinned to **`omop_synth_pad_amp_dispo`** (NOT `..._synth`) even though
 this repo is `pad-amp-dispo-synth`. That physical schema is registered in
-the workspace's `synthetic_data/registry.yaml` (format: [charon's synthetic_data README](https://github.com/Duke-Vascular-Informatics/charon/blob/main/synthetic_data/README.md)) (`id: pad_amp_dispo`) and is consumed by both
-`pad-amp-ed-desc` and `pad-oler-aki-desc` via view-overlays — both consume it through
-an overlay schema, never the bare name directly, which is what made the 2026-07-31
+the workspace's `synthetic_data/registry.yaml` (format: [charon's synthetic_data README](https://github.com/Duke-Vascular-Informatics/charon/blob/main/synthetic_data/README.md)) (dataset `id: pad_amp`) and is consumed by the studies listed in
+`consumers.yaml` through view-overlays — through an overlay schema, never the bare name
+directly, which is what made the 2026-07-31
 rename (`pad-amp-ed-synth`/`pad_amp_ed`/`omop_synth_pad_amp_ed_desc` → `pad-amp-dispo-synth`/
 `pad_amp_dispo`/`omop_synth_pad_amp_dispo`) low-risk: rebuild each consumer's overlay
-after any regeneration, but do not change the pinned name again without checking both
-consumers' overlay targets first.
+after any regeneration, but do not change the pinned name again without checking the
+consumers' overlay targets first. (The registry corrected on 2026-08-06 that `pad-oler-aki-desc`
+is not a consumer of this dataset.)
 
 ### After a Step 5/6 run
 

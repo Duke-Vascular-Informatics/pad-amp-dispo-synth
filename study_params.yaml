@@ -1,195 +1,50 @@
 # =============================================================================
 # study_params.yaml
-# OMOP Observational Study Parameters
+# Settings for ONE synthetic-dataset repo (a -synth repo).
 #
-# DATA-GENERATION-ONLY repo. This drives Synthea generation + ETL + QC (Steps 1-6).
-# There is no analysis or Word report here (Steps 7-9 removed) — the real analysis
-# lives in pad-amp-ed-desc (Strategus).
+# This file holds only what this repo needs to GENERATE and QC the dataset:
+# its identity, where it is loaded, and descriptive metadata. It does NOT define
+# cohorts, outcomes or covariates. What the dataset must contain is defined by the
+# studies that will use it, listed in consumers.yaml; their own cohort
+# definitions (in their Strategus repos) are read directly, so nothing is copied
+# or hand-maintained here:
+#   workflow/02  lists those studies' cohorts
+#   workflow/03  checks the Synthea module can produce them
+#   workflow/06  checks the final data contains them
 #
 # SETUP ORDER:
-#   1. Author/adjust the Synthea module in synthea/modules/pad_amp_dispo.json
-#   2. Run: Rscript workflow/03_generate_synthea_module_artifacts.R  — validate + diagram
-#   3. Run: Steps 4-5 (generate CSVs, ETL to omop_synth_pad_amp_dispo)
-#   4. Run: Rscript workflow/06_quality_check_defined_phenotypes.R  — QC counts
-#   5. Register the dataset (id: pad_amp_dispo) in ../synthetic_data/registry.yaml
+#   1. Fill in every TODO in this file and in consumers.yaml
+#   2. Rscript scripts/find_todos.R          # remaining placeholders
+#   3. Rscript scripts/check_setup.R         # [OK] / [WARN] / [FAIL] checklist
+#   4. Rscript workflow/02_define_omop_cohort_outcome_covariates.R   # consumers' cohorts
+#   5. Design the Synthea module, then run workflows 03-06 and register the dataset
+#      in synthetic_data/registry.yaml. See README.md.
 #
-# CONCEPT ID LOOKUP — before writing any concept ID, run in Claude Code chat:
-#   /concept-lookup total hip replacement procedure
-#   /concept-lookup venous thromboembolism condition
+# CONCEPT IDs: this repo contains none. Concept sets live in the consuming
+# studies' cohort definitions and follow Rule 1 (CLAUDE.md) there.
 # =============================================================================
 
 # =============================================================================
 # STUDY IDENTITY
 # =============================================================================
-study_name:   "pad_amp_dispo_synth"  # data-generation-only repo: PAD major-amputation → post-discharge ED synthetic CDM for pad-amp-ed-desc dev/test. No real analysis runs here (Steps 7-8 unused).
-study_design: "descriptive"       # inert here — Steps 7-8 never run in a -synth repo
+study_name: "pad_amp_dispo_synth"   # data-generation-only repo: PAD major-amputation → post-discharge disposition/utilization synthetic CDM (non-home discharge, ED visit, readmission, mortality)
 
 # =============================================================================
-# STUDY DATE WINDOW
-# Index events outside this range are excluded from all cohorts.
+# DATABASE SCHEMAS
 # =============================================================================
-study_start_date: "2017-01-01"
-study_end_date:   "2025-12-31"
+# CDM schema populated by workflow/05 (the ETL). Must be set explicitly: the CDM
+# is a shared dataset, so it cannot be derived from study_name.
+cdm_schema: "omop_synth_pad_amp_dispo"   # PINNED name (deliberately not tied to this repo's own _synth suffix):
+                                          # this physical schema is registered in ../synthetic_data/registry.yaml
+                                          # (dataset id: pad_amp). Renamed 2026-07-31 from omop_synth_pad_amp_ed_desc;
+                                          # see CLAUDE.md "Schema naming". v2 of the dataset lives in
+                                          # omop_synth_pad_amp_v2 (pass --cdm_schema=omop_synth_pad_amp_v2 to the QC
+                                          # scripts to check it). Populated by workflow/05; rebuild each consumer's
+                                          # overlay after any regeneration.
 
-# =============================================================================
-# DATABASE SCHEMAS FOR SYNTHETIC DATA
-# =============================================================================
-cdm_schema:     "omop_synth_pad_amp_dispo"   # PINNED name (deliberately not tied to this repo's
-                                                # own _synth suffix): this physical schema is registered in
-                                                # ../synthetic_data/registry.yaml (id: pad_amp_dispo) and is
-                                                # consumed by pad-amp-ed-desc AND pad-oler-aki-desc, both via
-                                                # view-overlays (never the bare schema directly). Renamed
-                                                # 2026-07-31 from omop_synth_pad_amp_ed_desc — see CLAUDE.md
-                                                # "Schema naming" for why that rename was low-risk. Rebuild
-                                                # both consumers' overlays after any regeneration.
-                                                # Populated by Step 5 ETL; overwritten each regeneration.
-
-# results_schema, cohort_table, and output_folder default to
-#   <study_name>_results, <study_name>_cohort, output/<study_name>
-# (with hyphens / spaces / dots in study_name collapsed to underscores).
-# Uncomment and set explicitly only if you need a non-standard name.
-# results_schema: ~
-# cohort_table:   ~
-
-# Optional: set only when the results schema is in a different SQL Server database
-# from the CDM. Leave commented out otherwise.
-# results_database: ~
-
-# =============================================================================
-# TARGET / EXPOSURE COHORT
-# Defines WHO enters the study (index event) and WHEN (index date).
-# =============================================================================
-target:
-  cohort_id: 1
-  sql_file:  "cohorts/target_amputation.sql"   # copied from pad-amp-nhd-val; includes PAD/DM/wound indication filter
-
-  # Visit type filter — inpatient only (9201); amputation index events are inpatient admissions.
-  visit_concept_ids: [9201]
-
-  # Minimum age at index date (years).
-  min_age_at_index: 18
-
-  # Index event: major lower extremity amputation (BKA/AKA).
-  # Six SNOMED ancestor concept IDs covering the full AKA/BKA tree.
-  # All verified via Tier 3 vocab query 2026-05-14 (pad-amp-nhd-val).
-  index_event:
-    domain: "procedure"
-    ancestor_concept_ids:
-      - 4195136   # [vocab query] Amputation of foot
-      - 4338257   # [vocab query] Amputation of lower leg
-      - 4143795   # [vocab query] Amputation above knee
-      - 4242396   # [vocab query] Amputation of toe
-      - 4264289   # [vocab query] Amputation through ankle
-      - 36675618  # [vocab query] Amputation through knee
-
-  # Washout: disabled — descriptive design; no prior-outcome exclusion needed.
-  washout:
-    domain: "condition"
-    ancestor_concept_ids: []
-    lookback_days: 365
-
-# =============================================================================
-# OUTCOME COHORT
-# Defines WHAT the study is measuring.
-# Set cohort_id and sql_file to ~ (null) for cohort_characterization or descriptive designs.
-# =============================================================================
-outcome:
-  cohort_id: 2
-  sql_file:  "cohorts/outcome_ed_visit.sql"   # TODO [OUTCOME SQL]: write visit-type based ED visit SQL (visit_concept_id = 9203)
-
-  # ED visit is a visit_occurrence event (visit_concept_id = 9203), not a
-  # condition or procedure ancestry chain. The SQL handles this directly.
-  # ancestor_concept_ids is left empty to bypass the R/cohorts.R concept-ID guard.
-  ancestor_concept_ids: []
-
-# =============================================================================
-# COMPARATOR COHORT (causal inference only)
-# Set cohort_id to ~ (null) to disable for all other study designs.
-# When enabled, fill in index_event.ancestor_concept_ids exactly as you did
-# for the target cohort — the comparator is the ALTERNATIVE exposure being
-# compared against the target (e.g. Drug A vs Drug B, Procedure X vs Procedure Y).
-# =============================================================================
-comparator:
-  cohort_id: ~   # ~ = disabled. Set to an integer (e.g. 3) for causal inference
-  sql_file:  "cohorts/comparator_cohort.sql"
-  visit_concept_ids: [9201]
-  min_age_at_index: 18
-  index_event:
-    domain: "procedure"
-    ancestor_concept_ids: ~   # TODO [COMPARATOR]: set when cohort_id is enabled [REQUIRES vocab query]
-  washout:
-    domain: "condition"
-    ancestor_concept_ids: ~   # ~ = no washout; set to concept IDs to enable
-    lookback_days: 365
-
-# =============================================================================
-# NEGATIVE CONTROL OUTCOMES (causal inference only)
-# Used for empirical calibration of the outcome model via EmpiricalCalibration.
-# List OMOP standard condition concept IDs representing outcomes that are
-# clinically implausible consequences of the exposure — i.e., outcomes where
-# the true hazard ratio is 1.0 by assumption.
-#
-# How to choose negative controls:
-#   1. Select conditions unrelated to the mechanism of action of your exposure.
-#   2. Verify each concept ID with /concept-lookup before adding it here.
-#   3. Aim for 20–50 negative controls; fewer than 5 produces unreliable calibration.
-#   4. Leave the list empty ([]) to skip empirical calibration even when
-#      causal_inference is enabled.
-#
-# Example:
-#   ancestor_concept_ids:
-#     - 4112343   # [vocab query] Ingrown nail
-#     - 440417    # [vocab query] Fracture of wrist
-#
-# TODO [CAUSAL INFERENCE]: populate before running causal_inference analysis.
-# =============================================================================
-negative_controls:
-  ancestor_concept_ids: []   # TODO [CAUSAL INFERENCE]: add verified negative control concept IDs
-
-
-# =============================================================================
-# ANALYSIS PARAMETERS
-# =============================================================================
-# Days after index date during which the outcome is counted.
-# Must match riskWindowEnd in Step 8 analysis settings.
-# 90-day post-discharge window — extended from standard 30-day CMS window to
-# capture delayed ED presentations common in post-amputation patients.
-prediction_window_days: 90
-
-# Minimum days of prior observation required before index date.
-min_prior_observation_days: 365
-
-# Days before index date for covariate extraction window.
-# Set to 1095 (3 years) to match the VA-FI frailty covariate lookback window.
-covariate_lookback_days: 1095
-
-# =============================================================================
-# ANALYSES
-# DATA-GENERATION-ONLY repo: every flag stays false. Steps 7-8 (analysis + Word
-# report) never run here. The real analysis lives in pad-amp-ed-desc (Strategus).
-# =============================================================================
-analyses:
-  cohort_diagnostics:       false  # not used by this repo — no Step 7/8 analysis ever runs here
-  cohort_characterization:  false  # not used by this repo
-  prognostic_model:         false  # not used by this repo
-  causal_inference:         false  # not used by this repo
-  integer_risk_score:       false  # not used by this repo
-  descriptive_ed_analysis:  false  # not used by this repo
-  word_report:              false  # not used by this repo
-  plp_model_validation:     false  # not used by this repo
-
-# =============================================================================
-# REPORT GENERATION
-# Controls how generate_manuscript_report() renders narrative text and tables.
-# score_type is only used when study_design is "prognostic_model".
-# Other study designs will use their own report: sub-keys when implemented.
-# =============================================================================
-report:
-  score_type:             "integer"                                  # not used for descriptive design
-  outcome_label:          "Emergency Department (ED) Visit"
-  model_type_description: "descriptive cohort characterization"
-  # lasso score_type only — path to PatientLevelPrediction variable-importance RDS:
-  # var_imp_file: "model/varImp.rds"
+# Optional. Results schema (Achilles / DQD output and QC scratch tables) defaults
+# to <study_name>_results. Uncomment only for a non-standard name.
+# results_schema: "my_study_results"
 
 # =============================================================================
 # OUTPUT
@@ -200,8 +55,8 @@ report:
 
 # =============================================================================
 # DATABASE METADATA
-# Used in PatientLevelPrediction result objects and analysis reports.
+# Descriptive metadata recorded for the generated dataset.
 # =============================================================================
 cdm_database_id:          "pad_amp_dispo_synth_cdm_v5.4"
 cdm_database_name:        "PAD Amputation ED Visit — Synthetic Dataset"
-cdm_database_description: "Synthetic OMOP CDM: patients undergoing major lower extremity amputation (BKA/AKA) for dysvascular, diabetic, or wound indications, with a modeled 90-day post-discharge ED-visit outcome. Data-generation-only — no real patients, no analysis run against it in this repo; consumed by pad-amp-ed-desc (Strategus) and pad-oler-aki-desc via view-overlays."
+cdm_database_description: "Synthetic OMOP CDM: patients undergoing major lower extremity amputation (BKA/AKA) for dysvascular, diabetic, or wound indications, with a modeled 90-day post-discharge ED-visit outcome. Data-generation-only — no real patients, no analysis run against it in this repo. Its consuming studies are listed in consumers.yaml."

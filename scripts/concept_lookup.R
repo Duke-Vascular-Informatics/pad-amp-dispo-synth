@@ -38,7 +38,7 @@
 #
 # PREREQUISITES
 # -------------
-#   - Java 17 (JAVA_HOME set) and the JDBC driver (run workflow/07 first)
+#   - Java 17 (JAVA_HOME set) and the JDBC driver (provisioned by workflow/01)
 #   - DatabaseConnector and SqlRender installed in the project renv library
 # =============================================================================
 
@@ -173,6 +173,7 @@ if (nrow(results) < 3) {
     SqlRender::translate(sql_synonym, "sql server"),
     snakeCaseToCamelCase = FALSE
   )
+  names(results)     <- toupper(names(results))
   names(syn_results) <- toupper(names(syn_results))
   # Combine, deduplicating by concept_id.
   results <- unique(rbind(results, syn_results))
@@ -254,10 +255,8 @@ cat("Vocabulary             : ", results$VOCABULARY_ID[1], "\n", sep = "")
 cat("Concept class          : ", results$CONCEPT_CLASS_ID[1], "\n\n", sep = "")
 cat("[vocab query] Confirmed against", config$vocab_schema,
     "in this SQL Server instance.\n")
-cat("Safe to use in code and CSV files for this vocabulary version.\n\n")
-cat("To use in covariates/covariate_concepts.csv:\n")
-cat("  covariate_id,concept_id,include_descendants\n")
-cat("  <your_covariate_id>,", best_id, ",TRUE\n\n", sep = "")
+cat("Safe to use in code and cohort definitions for this vocabulary version.\n\n")
+cat("Use it in a cohort definition's concept set (in the consuming Strategus repo).\n\n")
 cat("To use in phenotype_library/catalog.yaml:\n")
 cat("  concept_id:", best_id, "\n")
 cat("  concept_name: \"", best_nm, "\"\n", sep = "")

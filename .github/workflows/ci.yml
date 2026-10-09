@@ -90,7 +90,7 @@ jobs:
             lints <- lintr::lint_dir(
               '.',
               pattern = '[.][Rr]\$',
-              exclusions = list('renv', 'portable', 'scripts/archive')
+              exclusions = list('renv', 'scripts/archive')
             )
             print(lints)
             if (length(lints) > 0) {

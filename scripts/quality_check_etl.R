@@ -59,8 +59,6 @@ source("R/connection.R")
 #   --run_name=<name>
 #   --enforce_thresholds=<true|false>
 #   --min_person_rows=<n>
-#   --min_open_revascularization_rows=<n>
-#   --min_outcome_condition_rows=<n>
 #   --min_mapped_condition_pct=<pct>
 #   --run_achilles=<true|false>     Run ACHILLES CDM profiling (default: TRUE)
 #   --run_dqd=<true|false>          Run OHDSI Data Quality Dashboard (default: TRUE)
@@ -74,8 +72,6 @@ parse_args <- function(args) {
     run_name = "",
     enforce_thresholds = FALSE,
     min_person_rows = 1,
-    min_open_revascularization_rows = 1,
-    min_outcome_condition_rows = 1,
     min_mapped_condition_pct = 0,
     run_achilles = TRUE,
     run_dqd = TRUE,
@@ -95,8 +91,14 @@ parse_args <- function(args) {
         if (identical(key, "run_name")) opts$run_name <- val
         if (identical(key, "enforce_thresholds")) opts$enforce_thresholds <- parse_bool(val)
         if (identical(key, "min_person_rows")) opts$min_person_rows <- as.numeric(val)
-        if (identical(key, "min_open_revascularization_rows")) opts$min_open_revascularization_rows <- as.numeric(val)
-        if (identical(key, "min_outcome_condition_rows")) opts$min_outcome_condition_rows <- as.numeric(val)
+        # Removed: these checked a PAD-specific procedure (hard-coded concept IDs) and
+        # an SSI outcome, which only made sense for one study. Study-specific checks
+        # now live in consumer-study QC (scripts/consumer_cohort_qc.R).
+        if (key %in% c("min_open_revascularization_rows", "min_ssi_condition_rows", "min_outcome_condition_rows")) {
+          warning("--", key, " was removed and is ignored. Study-specific checks are now ",
+                  "consumer-study QC, driven by the cohorts of the studies in consumers.yaml.",
+                  call. = FALSE)
+        }
         if (identical(key, "min_mapped_condition_pct")) opts$min_mapped_condition_pct <- as.numeric(val)
         if (identical(key, "run_achilles")) opts$run_achilles <- parse_bool(val)
         if (identical(key, "run_dqd"))     opts$run_dqd     <- parse_bool(val)
@@ -330,32 +332,12 @@ summary_sql <- SqlRender::translate(SqlRender::render(
     "  (SELECT COUNT(*) FROM @cdm_schema.procedure_occurrence po WHERE po.person_id IN (\n",
     "     SELECT p.person_id FROM @cdm_schema.person p WHERE ", person_filter, "\n",
     "   )) AS procedure_rows,\n",
-    "  (SELECT COUNT(*) FROM @cdm_schema.procedure_occurrence po WHERE po.person_id IN (\n",
-    "     SELECT p.person_id FROM @cdm_schema.person p WHERE ", person_filter, "\n",
-    "   ) AND EXISTS (\n",
-    "     SELECT 1 FROM @cdm_schema.concept_ancestor ca\n",
-    "     WHERE ca.descendant_concept_id = po.procedure_concept_id\n",
-    "       AND ca.ancestor_concept_id IN (4236706, 4225375)\n",
-    "   )) AS open_revascularization_rows,\n",
     "  (SELECT COUNT(*) FROM @cdm_schema.condition_occurrence co WHERE co.person_id IN (\n",
     "     SELECT p.person_id FROM @cdm_schema.person p WHERE ", person_filter, "\n",
     "   )) AS condition_rows,\n",
     "  (SELECT COUNT(*) FROM @cdm_schema.condition_occurrence co WHERE co.person_id IN (\n",
     "     SELECT p.person_id FROM @cdm_schema.person p WHERE ", person_filter, "\n",
     "   ) AND co.condition_concept_id > 0) AS mapped_condition_rows,\n",
-    "  (SELECT COUNT(*) FROM @cdm_schema.condition_occurrence co WHERE co.person_id IN (\n",
-    "     SELECT p.person_id FROM @cdm_schema.person p WHERE ", person_filter, "\n",
-    "   ) AND co.condition_concept_id = 317309) AS pad_condition_rows,\n",
-    # Include outcome condition count only when outcome concept IDs are configured.
-  if (length(config$outcome_concept_ids) > 0) paste0(
-    "  (SELECT COUNT(*) FROM @cdm_schema.condition_occurrence co WHERE co.person_id IN (\n",
-    "     SELECT p.person_id FROM @cdm_schema.person p WHERE ", person_filter, "\n",
-    "   ) AND EXISTS (\n",
-    "     SELECT 1 FROM @cdm_schema.concept_ancestor ca\n",
-    "     WHERE ca.descendant_concept_id = co.condition_concept_id\n",
-    "       AND ca.ancestor_concept_id IN (", paste(config$outcome_concept_ids, collapse = ", "), ")\n",
-    "   )) AS outcome_condition_rows,\n"
-  ) else NULL,
     "  (SELECT COUNT(*) FROM @cdm_schema.condition_era ce WHERE ce.person_id IN (\n",
     "     SELECT p.person_id FROM @cdm_schema.person p WHERE ", person_filter, "\n",
     "   )) AS condition_era_rows,\n",
@@ -383,8 +365,6 @@ value_from_summary <- function(df, candidates) {
 }
 
 person_rows <- value_from_summary(summary_df, c("personRows", "person_rows"))
-open_revasc_rows <- value_from_summary(summary_df, c("openRevascularizationRows", "open_revascularization_rows"))
-outcome_rows <- value_from_summary(summary_df, c("outcomeConditionRows", "outcome_condition_rows"))
 condition_rows <- value_from_summary(summary_df, c("conditionRows", "condition_rows"))
 mapped_condition_rows <- value_from_summary(summary_df, c("mappedConditionRows", "mapped_condition_rows"))
 condition_era_rows <- value_from_summary(summary_df, c("conditionEraRows", "condition_era_rows"))
@@ -427,50 +407,13 @@ print(age_df)
 cat("\n")
 
 # -----------------------------------------------------------------------------
-# Clinical signal check: rough face-validity counts for study-relevant markers.
+# Study-specific checks live in consumer-study QC
 # -----------------------------------------------------------------------------
-# Build the outcome signal subquery dynamically from config$outcome_concept_ids.
-# When no outcome concept IDs are configured, the outcome column is omitted.
-outcome_signal_col <- if (length(config$outcome_concept_ids) > 0) {
-  paste0(
-    "  -- Outcome: concept_ancestor rollup under config$outcome_concept_ids\n",
-    "  (SELECT COUNT(DISTINCT co.person_id)\n",
-    "   FROM @cdm_schema.condition_occurrence co\n",
-    "   INNER JOIN @cdm_schema.concept_ancestor ca\n",
-    "     ON ca.descendant_concept_id = co.condition_concept_id\n",
-    "   WHERE ca.ancestor_concept_id IN (", paste(config$outcome_concept_ids, collapse = ", "), ")\n",
-    "     AND co.person_id IN (SELECT p2.person_id FROM @cdm_schema.person p2 WHERE ", person_filter, ")\n",
-    "  ) AS people_with_outcome"
-  )
-} else {
-  # No outcome concept IDs configured — emit a placeholder column.
-  "  NULL AS people_with_outcome"
-}
-
-signal_sql <- SqlRender::translate(SqlRender::render(
-  paste0(
-    "SELECT\n",
-    "  -- Index procedure: concept_ancestor rollup under target ancestor concept IDs\n",
-    "  (SELECT COUNT(DISTINCT po.person_id)\n",
-    "   FROM @cdm_schema.procedure_occurrence po\n",
-    "   INNER JOIN @cdm_schema.concept_ancestor ca\n",
-    "     ON ca.descendant_concept_id = po.procedure_concept_id\n",
-    "   WHERE ca.ancestor_concept_id IN (",
-         paste(
-           if (length(config$target_index_concept_ids) > 0) config$target_index_concept_ids else "NULL",
-           collapse = ", "
-         ), ")\n",
-    "     AND po.person_id IN (SELECT p2.person_id FROM @cdm_schema.person p2 WHERE ", person_filter, ")\n",
-    "  ) AS people_with_index_procedure,\n",
-    outcome_signal_col, ";"
-  ),
-  cdm_schema = cdm_schema_active
-), targetDialect = config$dbms)
-
-signal_df <- run_query(signal_sql)
-cat("Clinical signal check\n")
-print(signal_df)
-cat("\n")
+# This script checks the dataset in general (people, visits, mapping quality, era
+# tables, age). Whether the data contains what a particular study needs (its
+# target, outcome and covariate cohorts) is checked from the studies' OWN cohort
+# definitions in scripts/consumer_cohort_qc.R, which workflow/06 runs next, so no
+# concept IDs or outcome definitions are repeated here.
 
 # -----------------------------------------------------------------------------
 # Optional threshold gate for automated pipeline enforcement.
@@ -480,13 +423,6 @@ if (isTRUE(opts$enforce_thresholds)) {
 
   if (is.na(person_rows) || person_rows < opts$min_person_rows) {
     failures <- c(failures, paste0("person_rows < min_person_rows (", person_rows, " < ", opts$min_person_rows, ")"))
-  }
-  if (is.na(open_revasc_rows) || open_revasc_rows < opts$min_open_revascularization_rows) {
-    failures <- c(failures, paste0("open_revascularization_rows < min_open_revascularization_rows (", open_revasc_rows, " < ", opts$min_open_revascularization_rows, ")"))
-  }
-  if (length(config$outcome_concept_ids) > 0 &&
-      (is.na(outcome_rows) || outcome_rows < opts$min_outcome_condition_rows)) {
-    failures <- c(failures, paste0("outcome_condition_rows < min_outcome_condition_rows (", outcome_rows, " < ", opts$min_outcome_condition_rows, ")"))
   }
   if (is.na(mapped_pct) || mapped_pct < opts$min_mapped_condition_pct) {
     failures <- c(failures, paste0("mapped_condition_pct < min_mapped_condition_pct (", round(mapped_pct, 2), " < ", opts$min_mapped_condition_pct, ")"))

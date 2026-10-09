@@ -3,47 +3,26 @@
 
 steps:
   - step: 1
-    title: Install VS Code
-    anchor: step-1-install-vs-code-5-minutes
+    title: Complete the Workspace Setup
+    anchor: step-1-complete-the-workspace-setup-one-time-per-machine
   - step: 2
-    title: Set Up Git and Version Control
-    anchor: step-2-set-up-git-and-version-control-10-minutes
+    title: Check Whether a Dataset Already Exists
+    anchor: step-2-check-whether-a-dataset-already-exists-5-minutes
   - step: 3
-    title: Install Your AI Coding Assistant
-    anchor: step-3-install-your-ai-coding-assistant-10-minutes
+    title: Create Your Synth Repository from Template
+    anchor: step-3-create-your-synth-repository-from-template-5-minutes
   - step: 4
-    title: Create Your Parent Development Folder
-    anchor: step-4-create-your-parent-development-folder-5-minutes
+    title: Open in the Dev Container and Bootstrap
+    anchor: step-4-open-in-the-dev-container-and-bootstrap-10-minutes
   - step: 5
-    title: Create Your Study Repository from Template
-    anchor: step-5-create-your-study-repository-from-template-5-minutes
+    title: Declare the Studies Your Data Must Support
+    anchor: step-5-declare-the-studies-your-data-must-support-15-minutes
   - step: 6
-    title: Check Whether Shared Local Setup Already Exists
-    anchor: step-6-check-whether-shared-local-setup-already-exists-2-minutes
+    title: Design the Analysis-Specific Synthea Module
+    anchor: step-6-design-the-analysis-specific-synthea-module-30-minutes
   - step: 7
-    title: Complete Machine Setup If Needed
-    anchor: step-7-complete-machine-setup-if-needed-20-60-minutes
+    title: Generate Synthetic Data, Run ETL, and Check Quality
+    anchor: step-7-generate-synthetic-data-run-etl-and-check-quality-60-minutes
   - step: 8
-    title: Open in Dev Container
-    anchor: step-8-open-in-dev-container-10-minutes
-  - step: 9
-    title: Check Whether OMOP Vocabulary Is Already Loaded
-    anchor: step-9-check-whether-omop-vocabulary-is-already-loaded-2-minutes
-  - step: 10
-    title: Load OMOP Vocabulary into SQL Server
-    anchor: step-10-load-omop-vocabulary-into-sql-server-3060-minutes
-  - step: 11
-    title: Define Your Cohort, Outcome, and Covariates
-    anchor: step-11-define-your-cohort-outcome-and-covariates-3060-minutes
-  - step: 12
-    title: Design Analysis-Specific Synthea Module
-    anchor: step-12-design-analysis-specific-synthea-module-optional-30-minutes
-  - step: 13
-    title: Generate Synthetic Data and Run ETL
-    anchor: step-13-generate-synthetic-data-and-run-etl-60-minutes
-  - step: 14
-    title: Create and Test Analysis Code
-    anchor: step-14-create-and-test-analysis-code-3060-minutes
-  - step: 15
-    title: Create Transportable Code Packet
-    anchor: step-15-create-transportable-code-packet-5-minutes
+    title: Register Your Synthetic Dataset
+    anchor: step-8-register-your-synthetic-dataset-10-minutes

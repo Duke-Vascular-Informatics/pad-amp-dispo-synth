@@ -144,14 +144,12 @@ If no standard concepts are found, state that clearly and suggest alternative se
 terms or vocabulary (e.g., "Try searching for the ingredient name rather than the
 brand name").
 
-### CSV usage hint
+### Usage hint
 
-After the recommendation, print the ready-to-paste row for `covariates/covariate_concepts.csv`:
-
-```
-covariate_id,concept_id,include_descendants
-<your_covariate_id>,<recommended_concept_id>,TRUE
-```
+After the recommendation, remind the user where the concept ID belongs. A `-synth` repo
+holds no concept sets of its own: the ID goes into a concept set of a cohort definition in the
+consuming Strategus repo (or the Synthea module as a source code), and into
+`phenotype_library/catalog.yaml` so the next study can reuse it.
 
 ## Disconnect
 
